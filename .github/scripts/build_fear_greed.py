@@ -82,6 +82,20 @@ PRICE_KEYS = ["momentum", "trend", "breadth", "volatility", "volume", "drawdown"
 EXTRA_KEYS = ["margin", "riskon"]
 PART_ORDER = PRICE_KEYS + EXTRA_KEYS + ["valuation"]
 
+# 分项权重（依据：① 成交与价格动量是 A 股情绪最直接的体现 ② 融资是真实的杠杆情绪
+# ③ 波动率降权——A 股"缩量低波动"多为情绪低迷而非贪婪，与美股语义不同
+# ④ 估值不参与合成——恐贪指数为情绪/交易面指标，估值单独作为参考项展示）
+WEIGHTS = {
+    "momentum": 1.6,    # 价格动量
+    "volume": 1.6,      # 量能热度
+    "margin": 1.4,      # 融资热度（杠杆资金）
+    "trend": 1.0,       # 短期趋势
+    "breadth": 1.0,     # 均线广度
+    "drawdown": 1.0,    # 回撤深度
+    "riskon": 0.8,      # 风险偏好
+    "volatility": 0.5,  # 波动率（降权）
+}   # valuation = 参考项，不计入
+
 
 def _get(url: str, timeout: int = 60, headers: dict = None) -> dict:
     h = {"User-Agent": UA, "Referer": "https://quote.eastmoney.com/", "Accept": "*/*", "Connection": "close"}
@@ -328,11 +342,18 @@ def score_rows(rows):
                 r["_r_" + k] = next(it)
     for r in rows:
         if "valuation" in r:
-            r["_r_valuation"] = r["valuation"]
-        vals = [v for k, v in r.items() if k.startswith("_r_")]
-        if vals:
-            r["score"] = round(sum(vals) / len(vals), 1)
-            r["n"] = len(vals)
+            r["_r_valuation"] = r["valuation"]          # 仅展示，不参与合成
+        num = den = 0.0
+        cnt = 0
+        for k, v in r.items():
+            if k.startswith("_r_") and k != "_r_valuation":
+                w = WEIGHTS.get(k[3:], 1.0)
+                num += v * w
+                den += w
+                cnt += 1
+        if den > 0:
+            r["score"] = round(num / den, 1)
+            r["n"] = cnt
     return [r for r in rows if "score" in r]
 
 
@@ -415,9 +436,10 @@ def main() -> None:
     out = {
         "date": as_of,
         "source": "自建多维模型（%d 分项分位合成）" % n_parts,
-        "model": ("价格动量 / 短期趋势 / 均线广度 / 波动率(反向) / 量能热度 / 融资热度 / "
-                  "风险偏好 / 回撤深度 / 估值分位(PE-TTM 近 60 个月)"),
+        "model": ("加权合成（价格动量1.6 / 量能1.6 / 融资1.4 / 短期趋势1 / 均线广度1 / "
+                  "回撤1 / 风险偏好0.8 / 波动率0.5）；估值分位为参考项，不计入合成"),
         "window": "价格类取近 3 年（750 交易日）滚动分位；估值取近 60 个月 PE 分位",
+        "weights": WEIGHTS,
         "sampling": "近 %d 个交易日为日线（标记 d），更早按每月最后一个交易日采样（标记 m）；时间跨度覆盖指数成立以来" % RECENT_DAYS,
         "indices": out_indices,
     }
