@@ -277,6 +277,30 @@
       .tile, header, .hero, .card { animation: none !important; }
       * { transition-duration: .01ms !important; }
     }
+
+    /* ===== 跨页面转场动画（View Transitions API，Chromium 111+）=====
+       点击「← 返回首页」「详细观测」等链接时，旧页面上滑淡出、新页面自下滑入 */
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) {
+      animation: vtOut .22s cubic-bezier(.4, 0, 1, 1) both;
+    }
+    ::view-transition-new(root) {
+      animation: vtIn .34s cubic-bezier(0, 0, .2, 1) both;
+    }
+    @keyframes vtOut { to { opacity: 0; transform: translate3d(0, -8px, 0) scale(.992); } }
+    @keyframes vtIn { from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.992); } }
+
+    /* ===== 帧率优化 ===== */
+    /* 背景层提升为独立合成层：滚动时不再与内容一起重绘 */
+    body::before { transform: translateZ(0); backface-visibility: hidden; }
+    /* 入场动画结束后彻底移除动画与合成层占用，避免持续消耗 */
+    .tile.settled { animation: none; will-change: auto; }
+    /* 桌面毛玻璃减轻（10px → 6px），降低每帧模糊成本 */
+    .card, .tile, header, footer { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+
+    @media (prefers-reduced-motion: reduce) {
+      ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+    }
   </style>
 </head>
 <body>
@@ -393,7 +417,7 @@
   /* ===== 樱花 ===== */
   (function () {
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    var COUNT = (window.innerWidth < 640) ? 8 : 14;
+    var COUNT = (window.innerWidth < 640) ? 5 : 8;
     var GLYPHS = ['🌸', '❀', '✿', '🌸', '❀'];
     var colors = ['#ffb7d9', '#ffc7e5', '#f5c7ff', '#ffd6ea'];
     for (var i = 0; i < COUNT; i++) {
