@@ -186,6 +186,21 @@
     .fg-item b { font-weight: 400; color: var(--muted); white-space: nowrap; }
     .fg-item i { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
 
+    /* ===== 预留占位卡（骨架与真实卡片一致） ===== */
+    .tile-empty {
+      border-style: dashed;
+      background: rgba(255, 255, 255, .42);
+      box-shadow: none;
+    }
+    .tile-empty .tile-title { color: var(--muted); font-weight: 400; }
+    .tile-empty .badge { color: var(--muted); border-style: dashed; background: transparent; }
+    .ph-text { color: #c9bdd4 !important; }
+    .ph-chart {
+      height: 52px; border-radius: 10px;
+      border: 2px dashed var(--line);
+      background: repeating-linear-gradient(90deg, transparent 0 14px, rgba(255, 215, 236, .5) 14px 15px);
+    }
+
     /* ===== 自适应：卡片越窄，排版越紧凑 ===== */
     @container (max-width: 300px) {
       .tile-title { font-size: 13px; }
@@ -292,9 +307,13 @@
         </div>
 
         <div class="tile-body">
-          <div class="fg-scale" aria-hidden="true"><i id="fgMark"></i></div>
-          <div class="fg-scale-lbl"><span>极度恐惧</span><span>中性</span><span>极度贪婪</span></div>
-          <div class="fg-list" id="fgList"></div>
+          <a class="spark-link" href="./fng.html" title="查看各指数详情">
+            <svg id="fgSpark" viewBox="0 0 800 44" preserveAspectRatio="none" aria-label="恐贪指数近 30 日走势"></svg>
+            <span class="cap">
+              <span id="fgSparkLabel">近 30 日走势</span>
+              <span>各指数 →</span>
+            </span>
+          </a>
         </div>
 
         <div class="tile-foot">
@@ -305,6 +324,59 @@
             <a class="btn detail" href="./fng.html">各指数详情 →</a>
           </div>
         </div>
+      </section>
+
+      <!-- 预留占位卡 ×4：骨架与真实卡片完全一致，后续添加指标时替换内容即可 -->
+      <section class="card tile tile-empty" aria-hidden="true">
+        <div class="tile-top">
+          <div class="tile-title">＋ 预留指标<span class="sub">等待接入数据</span></div>
+          <span class="badge">待定</span>
+        </div>
+        <div class="tile-mid">
+          <div class="vix-price flat ph-text">--</div>
+          <div class="vix-chg flat ph-text">待接入</div>
+        </div>
+        <div class="tile-body"><div class="ph-chart"></div></div>
+        <div class="tile-foot"><div class="tile-time">占位 · 骨架与其他卡片一致</div></div>
+      </section>
+
+      <section class="card tile tile-empty" aria-hidden="true">
+        <div class="tile-top">
+          <div class="tile-title">＋ 预留指标<span class="sub">等待接入数据</span></div>
+          <span class="badge">待定</span>
+        </div>
+        <div class="tile-mid">
+          <div class="vix-price flat ph-text">--</div>
+          <div class="vix-chg flat ph-text">待接入</div>
+        </div>
+        <div class="tile-body"><div class="ph-chart"></div></div>
+        <div class="tile-foot"><div class="tile-time">占位 · 骨架与其他卡片一致</div></div>
+      </section>
+
+      <section class="card tile tile-empty" aria-hidden="true">
+        <div class="tile-top">
+          <div class="tile-title">＋ 预留指标<span class="sub">等待接入数据</span></div>
+          <span class="badge">待定</span>
+        </div>
+        <div class="tile-mid">
+          <div class="vix-price flat ph-text">--</div>
+          <div class="vix-chg flat ph-text">待接入</div>
+        </div>
+        <div class="tile-body"><div class="ph-chart"></div></div>
+        <div class="tile-foot"><div class="tile-time">占位 · 骨架与其他卡片一致</div></div>
+      </section>
+
+      <section class="card tile tile-empty" aria-hidden="true">
+        <div class="tile-top">
+          <div class="tile-title">＋ 预留指标<span class="sub">等待接入数据</span></div>
+          <span class="badge">待定</span>
+        </div>
+        <div class="tile-mid">
+          <div class="vix-price flat ph-text">--</div>
+          <div class="vix-chg flat ph-text">待接入</div>
+        </div>
+        <div class="tile-body"><div class="ph-chart"></div></div>
+        <div class="tile-foot"><div class="tile-time">占位 · 骨架与其他卡片一致</div></div>
       </section>
       <!-- 后续指标卡直接往这里加，会自动铺成方格墙 -->
     </div>
@@ -441,8 +513,8 @@
 
     /* ---------- A股恐贪指数 ---------- */
     var elFgScore = $('fgScore'), elFgDelta = $('fgDelta'), elFgLevel = $('fgLevel'),
-        elFgTime = $('fgTime'), elFgMark = $('fgMark'), elFgErr = $('fgErr'),
-        elFgBtn = $('fgRefresh'), elFgList = $('fgList');
+        elFgTime = $('fgTime'), elFgErr = $('fgErr'), elFgBtn = $('fgRefresh'),
+        elFgSparkLabel = $('fgSparkLabel');
 
     function fgCls(s) {
       if (s < 20) return 1;
@@ -464,7 +536,6 @@
       elFgScore.className = 'vix-price fg-c' + c;
       elFgLevel.textContent = main.rating_cn || '--';
       elFgLevel.className = 'badge bg-c' + c;
-      elFgMark.style.left = Math.max(1, Math.min(99, s)) + '%';
       var pnum = main.parts ? Object.keys(main.parts).length : 0;
       elFgTime.textContent = '数据日期 ' + (d.date || '--') + (pnum ? ' · ' + pnum + ' 分项合成' : '');
 
@@ -478,14 +549,10 @@
         elFgDelta.textContent = '';
       }
 
-      if (elFgList) {
-        elFgList.innerHTML = list.slice(1).map(function (it) {
-          var cc = fgCls(parseFloat(it.score));
-          return '<span class="fg-item"><b>' + it.name + '</b><i class="fg-c' + cc + '">'
-            + parseFloat(it.score).toFixed(1) + '</i></span>';
-        }).join('');
-      }
+      if (pts.length) drawMini(elFgSpark(), elFgSparkLabel, pts.slice(-30), 'fg');
     }
+
+    function elFgSpark() { return $('fgSpark'); }
 
     function loadFg() {
       elFgBtn.disabled = true; elFgBtn.textContent = '刷新中…';
