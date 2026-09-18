@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="市场情绪看板 —— VIX 与波动率指标实时观测，数据来自 CBOE 官方。" />
+  <meta name="description" content="市场情绪看板 —— VIX 实时观测，数据来自 CBOE 官方。" />
   <title>✧ 市场情绪看板 · VIX 观测所 ✧</title>
   <style>
     :root {
       --bg-top: #ffe9f5;
       --bg-mid: #f2e9ff;
       --bg-bottom: #e2f2ff;
-      --panel: rgba(255, 255, 255, 0.75);
+      --panel: rgba(255, 255, 255, 0.78);
       --ink: #5a4a66;
       --muted: #9b8aa8;
       --line: #ffd7ec;
@@ -86,82 +86,67 @@
     }
     .hero-card p { color: var(--muted); font-size: 12px; line-height: 1.7; }
 
-    /* ===== 通用卡片 ===== */
+    /* ===== 卡片通用 ===== */
     .card {
       background: var(--panel);
       backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
       border: 2px solid var(--line); border-radius: var(--radius);
       box-shadow: var(--shadow);
-      padding: 16px 18px;
     }
 
-    /* ===== VIX 主卡（紧凑） ===== */
-    .vix-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-    .vix-title { font-weight: 700; font-size: 14px; }
-    .vix-title .sub { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+    /* ===== 方形卡片墙 ===== */
+    .wall {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+      gap: 14px;
+      align-items: start;
+    }
+    .tile {
+      aspect-ratio: 1 / 1;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      transition: transform .22s ease, box-shadow .22s ease;
+    }
+    .tile:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(255,126,182,.26); }
+
+    .tile-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .tile-title { font-weight: 700; font-size: 14px; line-height: 1.35; }
+    .tile-title .sub { display: block; color: var(--muted); font-weight: 400; font-size: 11px; margin-top: 2px; }
     .badge {
-      font-size: 12px; padding: 3px 12px; border-radius: 999px;
-      border: 2px solid var(--line); color: var(--muted); background: #fff; white-space: nowrap;
+      font-size: 11px; padding: 3px 10px; border-radius: 999px;
+      border: 2px solid var(--line); color: var(--muted); background: #fff; white-space: nowrap; flex: none;
     }
     .b-red    { color: var(--up);   border-color: #fecdd3; background: #fff1f2; }
     .b-orange { color: #d97706;     border-color: #fde68a; background: #fffbeb; }
     .b-green  { color: var(--down); border-color: #99f6e4; background: #f0fdfa; }
 
-    .vix-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-    .vix-main { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-    .vix-price { font-size: clamp(32px, 5vw, 42px); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
-    .vix-chg { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .tile-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+    .vix-price { font-size: clamp(38px, 9vw, 52px); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+    .vix-chg { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 6px; }
     .up   { color: var(--up); }    /* 涨：红（A股惯例） */
     .down { color: var(--down); }  /* 跌：绿 */
     .flat { color: var(--muted); }
 
-    .vix-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .spark-link { display: block; text-decoration: none; margin: 8px 0 10px; }
+    .spark-link svg { width: 100%; height: 44px; display: block; }
+    .spark-link .cap { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; margin-top: 2px; }
+    .spark-link:hover .cap { color: var(--ink); }
+
+    .tile-foot { border-top: 2px dashed var(--line); padding-top: 10px; }
+    .tile-time { color: var(--muted); font-size: 11px; margin-bottom: 8px; line-height: 1.5; }
+    .tile-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .btn {
       border: 2px solid var(--line); background: #fff; color: var(--ink);
-      border-radius: 999px; padding: 5px 14px; font-size: 12px; font-weight: 700;
+      border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 700;
       cursor: pointer; font-family: inherit; transition: all .2s ease; text-decoration: none; white-space: nowrap;
     }
     .btn:hover { border-color: var(--accent); color: var(--accent); }
     .btn:disabled { opacity: .5; cursor: wait; }
-    .btn.detail { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff; border-color: transparent; }
-
-    .vix-meta { margin-top: 6px; color: var(--muted); font-size: 12px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    .vix-err { color: #d97706; font-size: 11px; }
-
-    .spark-link { display: block; margin-top: 10px; padding-top: 10px; border-top: 2px dashed var(--line); text-decoration: none; color: var(--muted); font-size: 11px; }
-    .spark-link svg { width: 100%; height: 46px; display: block; margin-bottom: 4px; }
-    .spark-link .go { display: flex; justify-content: space-between; gap: 8px; }
-    .spark-link .arrow { font-weight: 700; color: var(--accent); white-space: nowrap; transition: transform .2s ease; }
-    .spark-link:hover { color: var(--ink); }
-    .spark-link:hover .arrow { transform: translateX(4px); }
-
-    /* ===== 指标网格 ===== */
-    .sec-title {
-      margin: 18px 4px 10px; font-weight: 700; font-size: 14px;
-      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-    }
-    .sec-title .sub { color: var(--muted); font-size: 11px; font-weight: 400; }
-    .idx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
-    #termCard { grid-column: span 2; grid-row: span 2; display: flex; flex-direction: column; }
-    #termCard > div:not(.n):not(.d) { flex: none; }
-    #termCard .term-tag { margin-top: auto; }
-    @media (max-width: 760px) { #termCard { grid-row: auto; } }
-    @media (max-width: 520px) { #termCard { grid-column: span 1 !important; } }
-    .idx { padding: 14px 16px; }
-    .idx .n { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
-    .idx .d { font-size: 11px; color: var(--muted); margin-bottom: 8px; line-height: 1.5; min-height: 16px; }
-    .idx .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.15; }
-    .idx .c { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 3px; min-height: 17px; }
-    .idx .t { font-size: 10px; color: var(--muted); margin-top: 6px; }
-
-    /* ===== 期限结构 ===== */
-    .term-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-    .term-row:last-of-type { margin-bottom: 0; }
-    .term-name { width: 54px; font-size: 12px; font-weight: 700; flex: none; }
-    .term-bar { flex: 1; height: 10px; background: #ffe9f5; border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
-    .term-bar i { display: block; height: 100%; border-radius: 999px; transition: width .5s ease; }
-    .term-val { width: 52px; text-align: right; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; flex: none; }
-    .term-tag { margin-top: 10px; font-size: 11px; color: var(--muted); border-top: 2px dashed var(--line); padding-top: 8px; line-height: 1.7; }
+    .btn.detail { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff; border-color: transparent; margin-left: auto; }
+    .vix-err { color: #d97706; font-size: 10px; width: 100%; }
 
     footer {
       position: relative; z-index: 1; text-align: center; padding: 16px;
@@ -185,65 +170,41 @@
     <section class="hero">
       <div class="hero-card">
         <h1>市场情绪看板</h1>
-        <p>VIX 与波动率指标 · CBOE 官方数据 · 每秒自动刷新 ♪</p>
+        <p>VIX 实时观测 · CBOE 官方数据 · 每秒自动刷新 ♪</p>
       </div>
     </section>
 
-    <!-- VIX 主卡 -->
-    <section class="card" aria-label="VIX 恐慌指数">
-      <div class="vix-head">
-        <div class="vix-title">📈 VIX 恐慌指数<span class="sub">标普500 30天隐含波动率</span></div>
-        <span class="badge" id="vixLevel">观测中…</span>
-      </div>
-      <div class="vix-row">
-        <div class="vix-main">
-          <span class="vix-price flat" id="vixPrice">--.--</span>
-          <span class="vix-chg flat" id="vixChg">等待数据…</span>
+    <div class="wall">
+      <!-- VIX 方形卡 -->
+      <section class="card tile" aria-label="VIX 恐慌指数">
+        <div class="tile-top">
+          <div class="tile-title">📈 VIX 恐慌指数<span class="sub">标普500 30天隐含波动率</span></div>
+          <span class="badge" id="vixLevel">观测中…</span>
         </div>
-        <div class="vix-actions">
-          <span id="vixErr" class="vix-err"></span>
-          <button class="btn" id="vixRefresh" type="button">✧ 刷新</button>
-          <a class="btn detail" href="./vix.html">详细观测 →</a>
-        </div>
-      </div>
-      <div class="vix-meta">
-        <span id="vixTime">最后成交：--</span>
-        <span>· CBOE 官方延迟行情，页面每 1 秒刷新</span>
-      </div>
-      <a class="spark-link" href="./vix.html">
-        <svg id="spark" viewBox="0 0 800 46" preserveAspectRatio="none" aria-label="VIX 近 30 日走势"></svg>
-        <span class="go">
-          <span id="sparkLabel">近 30 日收盘走势</span>
-          <span class="arrow">查看完整历史（1990 至今）→</span>
-        </span>
-      </a>
-    </section>
 
-    <!-- 指标网格 -->
-    <div class="sec-title">🔍 波动率与大盘指标 <span class="sub" id="idxUpdated">加载中…</span></div>
-    <div class="idx-grid" id="idxGrid">
-      <div class="card idx" id="termCard">
-        <div class="n">波动率期限结构</div>
-        <div class="d">短期（9天）→ 现货（30天）→ 中期（3个月）</div>
-        <div>
-          <div class="term-row">
-            <span class="term-name">VIX9D</span>
-            <span class="term-bar"><i id="bar9d" style="width:0%;background:#ffc2dd"></i></span>
-            <span class="term-val" id="val9d">--</span>
-          </div>
-          <div class="term-row">
-            <span class="term-name">VIX</span>
-            <span class="term-bar"><i id="barVix" style="width:0%;background:linear-gradient(90deg,#ff7eb6,#ffa8d0)"></i></span>
-            <span class="term-val" id="valVix">--</span>
-          </div>
-          <div class="term-row">
-            <span class="term-name">VIX3M</span>
-            <span class="term-bar"><i id="bar3m" style="width:0%;background:linear-gradient(90deg,#a78bfa,#c4b5fd)"></i></span>
-            <span class="term-val" id="val3m">--</span>
+        <div class="tile-mid">
+          <div class="vix-price flat" id="vixPrice">--.--</div>
+          <div class="vix-chg flat" id="vixChg">等待数据…</div>
+        </div>
+
+        <a class="spark-link" href="./vix.html" title="查看 VIX 完整历史">
+          <svg id="spark" viewBox="0 0 800 44" preserveAspectRatio="none" aria-label="VIX 近 30 日走势"></svg>
+          <span class="cap">
+            <span id="sparkLabel">近 30 日走势</span>
+            <span>1990 至今 →</span>
+          </span>
+        </a>
+
+        <div class="tile-foot">
+          <div class="tile-time" id="vixTime">最后成交：--</div>
+          <div class="tile-actions">
+            <span id="vixErr" class="vix-err"></span>
+            <button class="btn" id="vixRefresh" type="button">✧ 刷新</button>
+            <a class="btn detail" href="./vix.html">详细观测 →</a>
           </div>
         </div>
-        <div class="term-tag" id="termTag">正常升水：短期波动预期低于中长期，市场结构平稳。</div>
-      </div>
+      </section>
+      <!-- 后续指标卡直接往这里加，会自动铺成方格墙 -->
     </div>
   </main>
 
@@ -275,18 +236,16 @@
     }
   })();
 
-  /* ===== 看板数据 ===== */
+  /* ===== VIX 卡片数据 ===== */
   (function () {
     'use strict';
     var REFRESH_SECONDS = 1;
     var left = 0, busy = false, hasData = false, backoff = false;
+    var DATA_URL = './data/vix.json';   // 单指标实时快照
 
     var $ = function (id) { return document.getElementById(id); };
     var elPrice = $('vixPrice'), elChg = $('vixChg'), elTime = $('vixTime'), elLevel = $('vixLevel'),
-        elErr = $('vixErr'), elBtn = $('vixRefresh'), elUpdated = $('idxUpdated');
-
-    // 指标卡配置：顺序即展示顺序。加新指标 = 数据脚本加一条 + 这里加一行
-    var CARDS = ['vvix', 'spx', 'ndx', 'rut'];
+        elErr = $('vixErr'), elBtn = $('vixRefresh');
 
     function setCls(el, c) { el.classList.remove('up', 'down', 'flat'); el.classList.add(c); }
     function f2(n, d) {
@@ -295,16 +254,15 @@
     function fmtTime(t) { return (t || '--').replace('T', ' '); }
 
     function levelInfo(v) {
-      if (v >= 30) return ['极度恐慌 ≥30 (╥﹏╥)', 'b-red'];
-      if (v >= 20) return ['恐慌升温 20~30 (ﾟДﾟ;)', 'b-orange'];
-      if (v >= 15) return ['情绪中性 15~20 (・_・;)', ''];
-      return ['市场平静 <15 (´▽`)', 'b-green'];
+      if (v >= 30) return ['极度恐慌 (╥﹏╥)', 'b-red'];
+      if (v >= 20) return ['恐慌升温 (ﾟДﾟ;)', 'b-orange'];
+      if (v >= 15) return ['情绪中性 (・_・;)', ''];
+      return ['市场平静 (´▽`)', 'b-green'];
     }
 
-    /* ---------- VIX 主卡 ---------- */
-    function renderVix(d) {
-      var price = parseFloat(d.price), prev = parseFloat(d.prev);
-      var chg = parseFloat(d.change), pct = parseFloat(d.pct);
+    function render(d) {
+      var price = parseFloat(d.price), prev = parseFloat(d.prev_close);
+      var chg = parseFloat(d.change), pct = parseFloat(d.change_percent);
       if (!isFinite(price)) return;
       if (!isFinite(chg)) chg = price - prev;
       if (!isFinite(pct)) pct = prev ? (chg / prev) * 100 : 0;
@@ -320,84 +278,35 @@
         elChg.textContent = sign + f2(chg, 2) + ' (' + sign + f2(pct, 2) + '%)';
         setCls(elChg, dirCls);
       }
-      elTime.textContent = '最后成交：' + fmtTime(d.time) + '（美东）';
+      elTime.textContent = '最后成交：' + fmtTime(d.last_trade_time) + '（美东）';
       var info = levelInfo(price);
       elLevel.textContent = info[0];
       elLevel.className = 'badge ' + info[1];
       hasData = true;
     }
 
-    /* ---------- 指标卡 ---------- */
-    function cardHtml(item) {
-      var price = parseFloat(item.price);
-      var chg = parseFloat(item.change), pct = parseFloat(item.pct), prev = parseFloat(item.prev);
-      var noChange = !isFinite(chg) || (chg === 0 && prev === price);
-      var chgHtml;
-      if (noChange || !isFinite(price)) {
-        chgHtml = '<div class="c flat">收盘值（无当日涨跌数据）</div>';
-      } else {
-        var cls = chg > 0 ? 'up' : (chg < 0 ? 'down' : 'flat');
-        var sign = chg > 0 ? '+' : '';
-        chgHtml = '<div class="c ' + cls + '">' + sign + f2(chg, 2) + ' (' + sign + f2(pct, 2) + '%)</div>';
-      }
-      return '<div class="card idx">'
-        + '<div class="n">' + item.name + '</div>'
-        + '<div class="d">' + (item.desc || '') + '</div>'
-        + '<div class="v' + (chg > 0 ? ' up' : (chg < 0 ? ' down' : '')) + '">'
-        + (isFinite(price) ? f2(price, 2) : '--') + '</div>'
-        + chgHtml
-        + '<div class="t">' + fmtTime(item.time).slice(0, 16) + ' 美东</div>'
-        + '</div>';
-    }
-
-    function renderGrid(d) {
-      var g = $('idxGrid');
-      var olds = g.querySelectorAll('.idx:not(#termCard)');
-      for (var i = 0; i < olds.length; i++) g.removeChild(olds[i]);
-
-      var html = '';
-      CARDS.forEach(function (k) { if (d[k]) html += cardHtml(d[k]); });
-      if (html) {
-        var frag = document.createElement('div');
-        frag.innerHTML = html;
-        while (frag.firstChild) g.appendChild(frag.firstChild);
-      }
-      renderTerm(d);
-    }
-
-    /* ---------- 期限结构 ---------- */
-    function renderTerm(d) {
-      var v9 = d.vix9d ? parseFloat(d.vix9d.price) : NaN;
-      var vx = d.vix ? parseFloat(d.vix.price) : NaN;
-      var v3 = d.vix3m ? parseFloat(d.vix3m.price) : NaN;
-      var vals = [v9, vx, v3].filter(isFinite);
-      if (!vals.length) return;
-      var max = Math.max.apply(null, vals) * 1.18;
-
-      $('val9d').textContent = isFinite(v9) ? f2(v9, 2) : '--';
-      $('valVix').textContent = isFinite(vx) ? f2(vx, 2) : '--';
-      $('val3m').textContent = isFinite(v3) ? f2(v3, 2) : '--';
-      $('bar9d').style.width = isFinite(v9) ? Math.max(4, v9 / max * 100) + '%' : '0%';
-      $('barVix').style.width = isFinite(vx) ? Math.max(4, vx / max * 100) + '%' : '0%';
-      $('bar3m').style.width = isFinite(v3) ? Math.max(4, v3 / max * 100) + '%' : '0%';
-
-      var tag = $('termTag');
-      if (isFinite(v9) && isFinite(vx) && isFinite(v3)) {
-        if (v9 > vx && vx > v3) {
-          tag.textContent = '倒挂警示：短期波动预期高于中长期，市场处于紧张状态 (ﾟДﾟ;)。';
-        } else if (v9 < vx && vx < v3) {
-          tag.textContent = '正常升水：短期波动预期低于中长期，市场结构平稳。';
-        } else {
-          tag.textContent = '结构交错：各期限波动预期分歧，方向不明。';
-        }
-      }
+    function loadAll() {
+      if (busy) return;
+      busy = true; backoff = false;
+      elBtn.disabled = true; elBtn.textContent = '刷新中…';
+      fetch(DATA_URL + '?r=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (d) { render(d); elErr.textContent = ''; })
+        .catch(function () {
+          backoff = true;
+          elErr.textContent = hasData ? '⚠ 数据源暂不可用，显示上次数据' : '⚠ 加载失败，稍后重试';
+        })
+        .finally(function () {
+          busy = false; elBtn.disabled = false; elBtn.textContent = '✧ 刷新';
+          left = backoff ? Math.max(REFRESH_SECONDS, 10) : REFRESH_SECONDS;
+        });
     }
 
     /* ---------- 迷你走势（日频历史，低频更新） ---------- */
     function drawSpark(pts) {
       var el = $('spark');
       if (!el || !pts || !pts.length) return;
-      var W = 800, H = 46, pl = 3, pr = 3, pt = 6, pb = 6;
+      var W = 800, H = 44, pl = 3, pr = 3, pt = 6, pb = 6;
       var vs = pts.map(function (p) { return p[1]; });
       var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
       if (mx === mn) { mx += 1; mn -= 1; }
@@ -420,7 +329,7 @@
         '<path d="' + area + '" fill="url(#spArea)"/>' +
         '<path d="' + line + '" fill="none" stroke="url(#spLine)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>';
       var label = $('sparkLabel');
-      if (label) label.textContent = '近 30 日收盘走势（' + pts[0][0] + ' ~ ' + pts[pts.length - 1][0] + '）';
+      if (label) label.textContent = '近 30 日走势（' + pts[0][0].slice(5) + ' ~ ' + pts[pts.length - 1][0].slice(5) + '）';
     }
 
     function loadSpark() {
@@ -428,29 +337,6 @@
         .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(function (d) { if (d && d.points && d.points.length) drawSpark(d.points.slice(-30)); })
         .catch(function () {});
-    }
-
-    /* ---------- 主循环 ---------- */
-    function loadAll() {
-      if (busy) return;
-      busy = true; backoff = false;
-      elBtn.disabled = true; elBtn.textContent = '刷新中…';
-      fetch('./data/indices.json?r=' + Date.now(), { cache: 'no-store' })
-        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(function (d) {
-          if (d.vix) renderVix(d.vix);
-          renderGrid(d);
-          if (d.vix && d.vix.time) elUpdated.textContent = '（数据 ' + fmtTime(d.vix.time) + ' 美东）';
-          elErr.textContent = '';
-        })
-        .catch(function () {
-          backoff = true;
-          elErr.textContent = hasData ? '⚠ 数据源暂不可用，显示上次数据' : '⚠ 加载失败，稍后重试';
-        })
-        .finally(function () {
-          busy = false; elBtn.disabled = false; elBtn.textContent = '✧ 刷新';
-          left = backoff ? Math.max(REFRESH_SECONDS, 10) : REFRESH_SECONDS;
-        });
     }
 
     elBtn.addEventListener('click', function () { loadAll(); loadSpark(); });
