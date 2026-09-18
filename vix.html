@@ -106,7 +106,7 @@
     .kv .v { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
     /* ===== 图表 ===== */
-    .range-btns { display: flex; gap: 8px; }
+    .range-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
     .rbtn {
       border: 2px solid var(--line); background: #fff; color: var(--muted);
       border-radius: 999px; padding: 5px 14px; font-size: 12px; font-weight: 700;
@@ -212,10 +212,13 @@
       <div class="card-title">
         📈 收盘走势
         <span class="sub" id="chartSub">加载中…</span>
-        <span class="range-btns" style="margin-left:auto">
+        <span class="range-btns">
           <button class="rbtn" data-days="30" type="button">30日</button>
           <button class="rbtn on" data-days="60" type="button">60日</button>
           <button class="rbtn" data-days="120" type="button">120日</button>
+          <button class="rbtn" data-days="252" type="button">1年</button>
+          <button class="rbtn" data-days="1260" type="button">5年</button>
+          <button class="rbtn" data-days="0" type="button">全部</button>
         </span>
       </div>
       <div class="chart-wrap" id="chartWrap">
@@ -230,7 +233,7 @@
 
     <!-- 区间统计 -->
     <section class="card">
-      <div class="card-title">📊 近 <span id="statDays">120</span> 个交易日统计 <span class="sub" id="statUpdated"></span></div>
+      <div class="card-title">📊 区间统计 <span class="sub" id="statUpdated">加载中…</span></div>
       <div class="stat-grid">
         <div class="stat"><div class="k">区间最高</div><div class="v up" id="statHigh">--</div><div class="d" id="statHighD">--</div></div>
         <div class="stat"><div class="k">区间最低</div><div class="v down" id="statLow">--</div><div class="d" id="statLowD">--</div></div>
@@ -315,14 +318,24 @@
     var PAD = { l: 48, r: 56, t: 18, b: 36 };
     var W = 820, H = 320;
 
+    var MAXP = 1400;  // 绘图抽样上限，全量视图下保持流畅
+
     function plotPoints() {
       if (!HIST || !HIST.points || !HIST.points.length) return [];
-      var pts = HIST.points.slice(-RANGE);
-      // 若实时成交日比历史最后一日更新，则追加一个「今日」实时点
-      if (liveDate && lastPlottedPrice !== null) {
-        var lastD = pts[pts.length - 1].d;
-        if (liveDate > lastD) pts = pts.concat([{ d: liveDate, c: lastPlottedPrice, live: true }]);
-        else if (liveDate === lastD) { pts = pts.slice(0, -1).concat([{ d: lastD, c: lastPlottedPrice, live: true }]); }
+      var all = HIST.points;   // [["YYYY-MM-DD", close], ...]
+      var pts = (RANGE > 0 && RANGE < all.length) ? all.slice(-RANGE) : all.slice();
+      // 点太多时等距抽样（始终保留首尾）
+      if (pts.length > MAXP) {
+        var k = Math.ceil(pts.length / MAXP), s = [];
+        for (var i = 0; i < pts.length; i += k) s.push(pts[i]);
+        if (s[s.length - 1] !== pts[pts.length - 1]) s.push(pts[pts.length - 1]);
+        pts = s;
+      }
+      // 若实时成交日比历史最后一日更新，则追加/更新一个「今日」实时点
+      if (liveDate && lastPlottedPrice !== null && pts.length) {
+        var lastD = pts[pts.length - 1][0];
+        if (liveDate > lastD) pts = pts.concat([[liveDate, lastPlottedPrice, true]]);
+        else if (liveDate === lastD) pts = pts.slice(0, -1).concat([[lastD, lastPlottedPrice, true]]);
       }
       return pts;
     }
@@ -330,9 +343,9 @@
     function drawChart() {
       var pts = plotPoints();
       if (!pts.length) return;
-      var vs = pts.map(function (p) { return p.c; });
+      var vs = pts.map(function (p) { return p[1]; });
       var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
-      var padV = (mx - mn) * 0.12 || 1;
+      var padV = (mx - mn) * 0.07 || 1;
       mn -= padV; mx += padV;
 
       var x0 = PAD.l, x1 = W - PAD.r, y0 = PAD.t, y1 = H - PAD.b;
@@ -368,7 +381,7 @@
       // 面积 + 折线
       var line = '', area = '';
       pts.forEach(function (p, i) {
-        var x = nx(i), y = ny(p.c);
+        var x = nx(i), y = ny(p[1]);
         line += (i === 0 ? 'M' : 'L') + f2(x) + ' ' + f2(y);
         area += (i === 0 ? 'M' : 'L') + f2(x) + ' ' + f2(y);
       });
@@ -376,11 +389,13 @@
       s += '<path d="' + area + '" fill="url(#lgArea)"/>';
       s += '<path d="' + line + '" fill="none" stroke="url(#lgLine)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>';
 
-      // x 轴日期（首/中/尾）
+      // x 轴日期（首/中/尾）：跨度跨年时显示年份，否则显示月-日
+      var crossYear = pts[0][0].slice(0, 4) !== pts[pts.length - 1][0].slice(0, 4);
       [0, Math.floor((pts.length - 1) / 2), pts.length - 1].forEach(function (i) {
         if (i < 0) return;
         var x = nx(i);
-        s += '<text x="' + x + '" y="' + (H - 12) + '" text-anchor="middle" font-size="11" fill="#b8a6c4">' + pts[i].d.slice(5) + '</text>';
+        var label = crossYear ? pts[i][0].slice(0, 7) : pts[i][0].slice(5);
+        s += '<text x="' + x + '" y="' + (H - 12) + '" text-anchor="middle" font-size="11" fill="#b8a6c4">' + label + '</text>';
       });
 
       // 悬浮元素
@@ -392,8 +407,11 @@
       // 记录映射供 hover 使用
       svg._map = { pts: pts, nx: nx, ny: ny, x0: x0, x1: x1 };
 
-      var first = pts[0].d, last = pts[pts.length - 1].d;
-      $('chartSub').textContent = '（' + first + ' ~ ' + last + '，共 ' + pts.length + ' 个交易日）';
+      var rawN = (RANGE > 0 && RANGE < HIST.points.length) ? RANGE : HIST.points.length;
+      var first = pts[0][0], last = pts[pts.length - 1][0];
+      var sub = '（' + first + ' ~ ' + last + '，共 ' + rawN + ' 个交易日';
+      sub += (pts.length < rawN ? '，抽样绘制 ' + pts.length + ' 点' : '') + '）';
+      $('chartSub').textContent = sub;
       return pts;
     }
 
@@ -403,21 +421,18 @@
       var rect = svg.getBoundingClientRect();
       var px = (ev.clientX - rect.left) / rect.width * W;
       if (px < map.x0 - 10 || px > map.x1 + 10) { hideHover(); return; }
-      // 找最近索引
-      var best = 0, bestD = Infinity;
-      for (var i = 0; i < pts.length; i++) {
-        var d = Math.abs(map.nx(i) - px);
-        if (d < bestD) { bestD = d; best = i; }
-      }
+      // x 等距，直接算出最近索引
+      var best = Math.round((px - map.x0) / (map.x1 - map.x0) * (pts.length - 1));
+      best = Math.max(0, Math.min(pts.length - 1, best));
       var p = pts[best];
-      var x = map.nx(best), y = map.ny(p.c);
+      var x = map.nx(best), y = map.ny(p[1]);
       var hl = svg.querySelector('#hoverLine'), hd = svg.querySelector('#hoverDot');
       hl.setAttribute('x1', x); hl.setAttribute('x2', x); hl.setAttribute('opacity', '0.9');
       hd.setAttribute('cx', x); hd.setAttribute('cy', y); hd.setAttribute('opacity', '1');
       // tooltip 定位（换算成容器内像素）
       var leftPx = x / W * rect.width;
       var topPx = y / H * rect.height;
-      tip.textContent = p.d + '　' + f2(p.c) + (p.live ? '（实时）' : '');
+      tip.textContent = p[0] + '　' + f2(p[1]) + (p[2] ? '（实时）' : '');
       tip.style.left = leftPx + 'px';
       tip.style.top = topPx + 'px';
       tip.classList.add('on');
@@ -446,21 +461,23 @@
 
     /* ---------- 统计 ---------- */
     function renderStats(days) {
-      if (!HIST || !HIST.points) return;
-      var pts = HIST.points.slice(-days);
-      var vs = pts.map(function (p) { return p.c; });
-      var hi = pts[vs.indexOf(Math.max.apply(null, vs))];
-      var lo = pts[vs.indexOf(Math.min.apply(null, vs))];
+      if (!HIST || !HIST.points || !HIST.points.length) return;
+      var all = HIST.points;   // [["YYYY-MM-DD", close], ...]
+      var pts = (days > 0 && days < all.length) ? all.slice(-days) : all;
+      var vs = pts.map(function (p) { return p[1]; });
+      var mx = Math.max.apply(null, vs), mn = Math.min.apply(null, vs);
+      var hiIdx = vs.indexOf(mx), loIdx = vs.indexOf(mn);
       var sum = vs.reduce(function (a, b) { return a + b; }, 0);
       var avg = sum / vs.length;
-      var cur = HIST.stats && HIST.stats.current ? HIST.stats.current : vs[vs.length - 1];
+      var cur = vs[vs.length - 1];
       var pct = Math.round(vs.filter(function (v) { return v <= cur; }).length / vs.length * 100);
-      $('statDays').textContent = String(pts.length);
-      $('statUpdated').textContent = '（数据更新：' + (HIST.updated || '--') + '）';
-      $('statHigh').textContent = f2(hi.c);
-      $('statHighD').textContent = hi.d;
-      $('statLow').textContent = f2(lo.c);
-      $('statLowD').textContent = lo.d;
+
+      $('statUpdated').textContent = '（' + pts[0][0] + ' ~ ' + pts[pts.length - 1][0]
+        + '，共 ' + pts.length + ' 个交易日 · 数据更新 ' + (HIST.updated || '--') + '）';
+      $('statHigh').textContent = f2(mx);
+      $('statHighD').textContent = pts[hiIdx][0];
+      $('statLow').textContent = f2(mn);
+      $('statLowD').textContent = pts[loIdx][0];
       $('statAvg').textContent = f2(avg);
       $('statPct').textContent = pct + '%';
       $('statBar').style.width = Math.max(2, pct) + '%';
@@ -548,6 +565,18 @@
     setInterval(loadHist, 60000);
 
     elBtn.addEventListener('click', function () { loadLive(); loadHist(); });
+
+    // 支持 URL 直达区间，如 vix.html?days=0（全部）/ ?days=1260（5年）
+    (function initRangeFromUrl() {
+      var m = /[?&]days=(\d+)/.exec(location.search);
+      if (!m) return;
+      var d = parseInt(m[1], 10);
+      var btns = document.querySelectorAll('.rbtn[data-days]');
+      for (var i = 0; i < btns.length; i++) {
+        if (parseInt(btns[i].getAttribute('data-days'), 10) === d) { btns[i].click(); return; }
+      }
+    })();
+
     loadLive();
     loadHist();
   })();

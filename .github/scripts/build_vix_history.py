@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
-"""从 CBOE VIX_History.csv 生成站点用的近 N 日历史数据 JSON。
+"""从 CBOE VIX_History.csv 生成站点用的完整历史数据 JSON（自 1990-01-02 指数发布起）。
 
 用法:
     python build_vix_history.py [csv路径] [输出json路径]
 
 默认: /tmp/vixhist.csv -> data/vix-history.json
+
+输出结构（紧凑，控体积）:
+    {
+      "updated": "...", "count": 9276, "start": "1990-01-02", "end": "2026-09-17",
+      "points": [["1990-01-02", 17.24], ...],       # 全量 [日期, 收盘]
+      "stats": { ... 最近 120 日统计（兼容旧前端） }
+    }
 """
 import csv
 import json
@@ -12,7 +19,7 @@ import os
 import sys
 from datetime import datetime, timezone
 
-DAYS = 120
+RECENT = 120
 
 
 def main() -> None:
@@ -25,13 +32,7 @@ def main() -> None:
         for row in reader:
             try:
                 d = datetime.strptime(row["DATE"].strip(), "%m/%d/%Y").strftime("%Y-%m-%d")
-                rows.append({
-                    "d": d,
-                    "o": round(float(row["OPEN"]), 2),
-                    "h": round(float(row["HIGH"]), 2),
-                    "l": round(float(row["LOW"]), 2),
-                    "c": round(float(row["CLOSE"]), 2),
-                })
+                rows.append([d, round(float(row["CLOSE"]), 2)])
             except (ValueError, KeyError, TypeError):
                 continue
 
@@ -39,31 +40,40 @@ def main() -> None:
         print("no valid rows, abort")
         sys.exit(1)
 
-    points = rows[-DAYS:]
-    closes = [p["c"] for p in points]
+    # 去重 + 排序（同一日期只留一条）
+    dedup = {}
+    for d, c in rows:
+        dedup[d] = c
+    points = sorted(dedup.items())
+
+    recent = points[-RECENT:]
+    closes = [c for _, c in recent]
     cur = closes[-1]
-    hi = max(points, key=lambda p: p["c"])
-    lo = min(points, key=lambda p: p["c"])
-    avg = round(sum(closes) / len(closes), 2)
-    pctile = round(sum(1 for c in closes if c <= cur) / len(closes) * 100)
+    hi_d, hi_v = max(recent, key=lambda p: p[1])
+    lo_d, lo_v = min(recent, key=lambda p: p[1])
 
     out = {
         "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        "days": len(points),
+        "count": len(points),
+        "start": points[0][0],
+        "end": points[-1][0],
+        "source": "CBOE VIX_History.csv",
         "points": points,
         "stats": {
             "current": cur,
-            "high": {"v": hi["c"], "d": hi["d"]},
-            "low": {"v": lo["c"], "d": lo["d"]},
-            "avg": avg,
-            "percentile": pctile,
+            "high": {"v": hi_v, "d": hi_d},
+            "low": {"v": lo_v, "d": lo_d},
+            "avg": round(sum(closes) / len(closes), 2),
+            "percentile": round(sum(1 for c in closes if c <= cur) / len(closes) * 100),
         },
     }
 
     os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
     with open(dst, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
-    print("wrote %s: %d points, latest %s close=%s" % (dst, len(points), points[-1]["d"], cur))
+
+    size_kb = os.path.getsize(dst) / 1024
+    print("wrote %s: %d points (%s ~ %s), %.1f KB" % (dst, len(points), points[0][0], points[-1][0], size_kb))
 
 
 if __name__ == "__main__":

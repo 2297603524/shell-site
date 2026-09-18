@@ -477,7 +477,7 @@
     function drawSpark(pts) {
       if (!elSpark || !pts || !pts.length) return;
       var W = 800, H = 66, pl = 3, pr = 3, pt = 10, pb = 10;
-      var vs = pts.map(function (p) { return p.c; });
+      var vs = pts.map(function (p) { return p[1]; });
       var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
       if (mx === mn) { mx += 1; mn -= 1; }
       var pad = (mx - mn) * 0.12; mn -= pad; mx += pad;
@@ -485,7 +485,7 @@
       var ny = function (v) { return H - pb - (v - mn) / (mx - mn) * (H - pt - pb); };
       var line = '', area = '';
       pts.forEach(function (p, i) {
-        var x = nx(i).toFixed(1), y = ny(p.c).toFixed(1);
+        var x = nx(i).toFixed(1), y = ny(p[1]).toFixed(1);
         line += (i ? 'L' : 'M') + x + ' ' + y;
         area += (i ? 'L' : 'M') + x + ' ' + y;
       });
@@ -499,7 +499,7 @@
         '<path d="' + area + '" fill="url(#spArea)"/>' +
         '<path d="' + line + '" fill="none" stroke="url(#spLine)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>';
       if (elSparkLabel) {
-        elSparkLabel.textContent = '近 30 日收盘走势（' + pts[0].d + ' ~ ' + pts[pts.length - 1].d + '）';
+        elSparkLabel.textContent = '近 30 日收盘走势（' + pts[0][0] + ' ~ ' + pts[pts.length - 1][0] + '）· 完整历史可进详情页查看';
       }
     }
 
