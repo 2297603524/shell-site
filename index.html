@@ -247,23 +247,35 @@
       .spark-link .cap { display: none; }
     }
 
-    /* ===== 手机端 ===== */
-    @media (max-width: 480px) {
-      .tile { aspect-ratio: auto; min-height: 0; padding: 16px; }
-      .wall { grid-template-columns: 1fr; gap: 12px; }
-      main { padding: 12px 12px calc(28px + env(safe-area-inset-bottom)); }
-      header { margin: 8px 8px 0; padding: 8px 14px; top: calc(6px + env(safe-area-inset-top)); }
+    /* ===== 手机端：双列紧凑卡片（一屏可见 4 张） ===== */
+    @media (max-width: 640px) {
+      main { padding: 10px 10px calc(24px + env(safe-area-inset-bottom)); }
+      header { margin: 6px 8px 0; padding: 7px 13px; top: calc(5px + env(safe-area-inset-top)); }
       .logo-text { font-size: 14px; }
-      nav a { font-size: 13px; margin-left: 12px; }
-      .hero { min-height: 104px; border-width: 2px; border-radius: 14px; }
-      .vix-price { font-size: 42px; }
-      .vix-chg { font-size: 16px; }
-      .badge { font-size: 12px; padding: 4px 12px; }
-      .btn { padding: 9px 16px; font-size: 13px; }
-      .tile-actions { gap: 8px; }
-      .tile-time { font-size: 11.5px; }
-      .spark-link svg { height: 52px; }
-      .spark-link .cap { font-size: 11px; }
+      .logo-mark { width: 17px; height: 17px; }
+      .hero { min-height: 88px; border-width: 2px; border-radius: 12px; margin-bottom: 10px; }
+      .wall { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .tile { aspect-ratio: auto; min-height: 0; padding: 11px 12px; }
+      .tile-top { min-height: 0; }
+      .tile-title { font-size: 11.5px; line-height: 1.3; }
+      .tile-title .sub { display: none; }
+      .badge { font-size: 9.5px; padding: 2px 8px; border-width: 1.5px; }
+      .tile-mid { min-height: 0; padding: 4px 0 6px; }
+      .vix-price { font-size: 27px; }
+      .vix-chg { font-size: 11px; margin-top: 3px; }
+      .spark-link svg { height: 38px; }
+      .spark-link .cap { display: none; }
+      .tile-foot { padding-top: 7px; }
+      .tile-time { font-size: 10px; margin-bottom: 5px; }
+      .tile-actions { gap: 4px; flex-wrap: nowrap; }
+      .btn { padding: 4px 9px; font-size: 10.5px; border-width: 1.5px; }
+      .tile:active { transform: scale(.98); }
+      .tile-empty .ph-chart { height: 38px; }
+    }
+    /* 极窄（<360px）：徽章换行到标题下方 */
+    @media (max-width: 360px) {
+      .badge { margin-left: 0; }
+      .vix-price { font-size: 24px; }
     }
 
     /* ===== 尊重减弱动效偏好 ===== */
