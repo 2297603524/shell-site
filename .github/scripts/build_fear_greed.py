@@ -2,7 +2,8 @@
 """构建 A 股各主要指数的恐贪指数（9 分项多维模型，覆盖指数成立以来全历史）→ data/fear-greed.json
 
 数据源（全部免密钥）:
-    指数日K:  东财 push2his.eastmoney.com  →  腾讯 web.ifzq.gtimg.cn（兜底），尽量取全历史
+    指数日K:  东财 push2his.eastmoney.com  →  中证官网 csindex.com.cn（官方行情兜底）
+              →  腾讯 web.ifzq.gtimg.cn（分段兜底），尽量取全历史
     融资数据: 东财 datacenter RPTA_RZRQ_LSHJ（全市场融资买入额，2010-03 融资融券业务启动以来）
     指数估值: 乐咕乐股 legulegu.com（月度 PE-TTM 历史，部分自 2005 年起）
 
@@ -46,6 +47,8 @@ DC_MARGIN = ("https://datacenter-web.eastmoney.com/api/data/v1/get"
              "&sortColumns=DIM_DATE&sortTypes=-1&source=WEB&client=WEB")
 LG_PAGE = "https://legulegu.com/stockdata/sz50-ttm-lyr"
 LG_API = "https://legulegu.com/api/stockdata/index-basic-pe"
+CS_PERF = ("https://www.csindex.com.cn/csindex-home/perf/index-perf"
+           "?indexCode=%s&startDate=%d0101&endDate=20501231")
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36")
 
@@ -68,6 +71,8 @@ LARGE_CAP = ("1.000300", "sh000300", "沪深300", 2005)
 # 风险偏好分项特例：板块/风格指数没有对应的「小盘基准」，
 # 用「自身 vs 沪深300」的相对强弱衡量该风格的风险偏好（相对沪深300 跑赢 → 情绪贪婪）
 SECTOR_RISKON = {"黄金股", "中证2000", "中证红利"}
+# 中证官网（csindex.com.cn）兜底映射：东财/腾讯都不可用时的第三级数据源（官方行情，免密钥）
+CSI_FALLBACK = {"中证2000": "932000", "中证1000": "000852", "中证红利": "000922"}
 
 VAL_MAP = {
     "上证指数": "000010.SH",
@@ -178,8 +183,42 @@ def fetch_tx(code: str, first_year: int = 1990, seg: int = 3, workers: int = 3):
     return keys, [dedup[k][0] for k in keys], [dedup[k][1] for k in keys]
 
 
-def get_kline(label: str, em_id: str, tx_code: str, first_year: int = 1990):
-    """东财优先（单次全量），失败退避重试一次；再失败才走腾讯分段兜底"""
+def fetch_csindex(index_code: str, first_year: int):
+    """中证指数官网官方日行情（免密钥），作为第三级兜底。
+    返回 (dates, closes, vols)；量能用 tradingValue（成交金额，亿元）"""
+    url = CS_PERF % (index_code, max(2005, first_year))
+    d = None
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA, "Referer": "https://www.csindex.com.cn/"})
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                d = (json.load(resp).get("data")) or []
+            break
+        except Exception:  # noqa: BLE001
+            if attempt == 2:
+                raise
+            time.sleep(2)
+    dates, closes, vols = [], [], []
+    for r in d:
+        try:
+            dt = str(r.get("tradeDate") or "")
+            if len(dt) != 8:
+                continue
+            c = float(r.get("close") or 0)
+            v = float(r.get("tradingValue") or 0)
+        except (TypeError, ValueError):
+            continue
+        if c > 0:
+            dates.append("%s-%s-%s" % (dt[:4], dt[4:6], dt[6:8]))
+            closes.append(c)
+            vols.append(v)
+    if not dates:
+        raise ValueError("empty csindex rows")
+    return dates, closes, vols
+
+
+def get_kline(label: str, em_id: str, tx_code: str, first_year: int = 1990, csi_code: str = None):
+    """东财优先（单次全量），失败退避重试一次；再走中证官网兜底；最后腾讯分段"""
     for attempt in range(2):
         try:
             name, dates, closes, vols = fetch_em(em_id)
@@ -189,10 +228,17 @@ def get_kline(label: str, em_id: str, tx_code: str, first_year: int = 1990):
             pass
         if attempt == 0:
             time.sleep(2.5)                # 东财偶发限流：退避后重试
+    if csi_code:
+        try:
+            dates, closes, vols = fetch_csindex(csi_code, first_year)
+            print("   fallback → 中证官网: %s（%s 起 %d 条）" % (label, dates[0], len(dates)))
+            return label, dates, closes, vols
+        except Exception as e:  # noqa: BLE001
+            print("   中证官网兜底失败: %s" % e)
     try:
         dates, closes, vols = fetch_tx(tx_code, first_year)
     except Exception as e:  # noqa: BLE001
-        raise ValueError("东财与腾讯均不可用（最后错误: %s）" % e)
+        raise ValueError("东财/中证官网/腾讯均不可用（最后错误: %s）" % e)
     print("   fallback → 腾讯分段: %s（%s 起 %d 条）" % (label, dates[0], len(dates)))
     return label, dates, closes, vols
 
@@ -458,7 +504,8 @@ def main() -> None:
     out_indices, as_of = [], ""
     for em_id, tx_code, label, first_year in INDICES:
         try:
-            name, dates, closes, vols = get_kline(label, em_id, tx_code, first_year)
+            name, dates, closes, vols = get_kline(label, em_id, tx_code, first_year,
+                                                  CSI_FALLBACK.get(label))
         except Exception as e:  # noqa: BLE001
             print("skip %s: %s" % (label, e))
             continue
