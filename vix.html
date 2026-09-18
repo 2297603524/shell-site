@@ -109,13 +109,26 @@
     .kv .v { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
     /* ===== 图表 ===== */
-    .range-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+    .range-btns { display: flex; gap: 8px; flex-wrap: wrap; }
     .ctrl-row {
       display: flex; align-items: center; justify-content: space-between;
-      gap: 10px; flex-wrap: wrap; margin-bottom: 12px;
+      gap: 10px 16px; flex-wrap: wrap; margin-bottom: 12px;
+    }
+    .ctrl-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .ctrl-lbl {
+      font-size: 12px; font-weight: 700; color: var(--muted);
+      background: #fff; border: 1px dashed var(--line);
+      border-radius: 6px; padding: 3px 7px; white-space: nowrap;
     }
     .seg { display: flex; gap: 8px; flex-wrap: wrap; }
     .seg .rbtn { min-width: 58px; }
+    /* 区间按钮用「描边」风格，与「周期」的实心胶囊区分开，避免被误读成同一组 */
+    .range-btns .rbtn.on {
+      background: #fff0f8;
+      color: var(--accent);
+      border-color: var(--accent);
+      font-weight: 700;
+    }
     .rbtn {
       border: 2px solid var(--line); background: #fff; color: var(--muted);
       border-radius: 999px; padding: 5px 14px; font-size: 12px; font-weight: 700;
@@ -250,18 +263,24 @@
         <span class="sub" id="chartSub">加载中…</span>
       </div>
       <div class="ctrl-row">
-        <span class="seg">
-          <button class="rbtn on" data-mode="day" type="button">日线</button>
-          <button class="rbtn" data-mode="week" type="button">周线</button>
-          <button class="rbtn" data-mode="min" type="button">分时</button>
+        <span class="ctrl-group">
+          <span class="ctrl-lbl">周期</span>
+          <span class="seg">
+            <button class="rbtn on" data-mode="day" type="button">日线</button>
+            <button class="rbtn" data-mode="week" type="button">周线</button>
+            <button class="rbtn" data-mode="min" type="button">分时</button>
+          </span>
         </span>
-        <span class="range-btns" id="rangeBtns">
-          <button class="rbtn" data-days="30" type="button">30日</button>
-          <button class="rbtn on" data-days="60" type="button">60日</button>
-          <button class="rbtn" data-days="120" type="button">120日</button>
-          <button class="rbtn" data-days="252" type="button">1年</button>
-          <button class="rbtn" data-days="1260" type="button">5年</button>
-          <button class="rbtn" data-days="0" type="button">全部</button>
+        <span class="ctrl-group">
+          <span class="ctrl-lbl" id="rangeLbl">区间</span>
+          <span class="range-btns" id="rangeBtns">
+            <button class="rbtn" data-days="30" type="button">30日</button>
+            <button class="rbtn on" data-days="60" type="button">60日</button>
+            <button class="rbtn" data-days="120" type="button">120日</button>
+            <button class="rbtn" data-days="252" type="button">1年</button>
+            <button class="rbtn" data-days="1260" type="button">5年</button>
+            <button class="rbtn" data-days="0" type="button">全部</button>
+          </span>
         </span>
       </div>
       <div class="chart-wrap" id="chartWrap">
@@ -437,9 +456,15 @@
 
     function drawChart() {
       var pts = plotPoints();
-      if (!pts.length) return;
+      if (!pts.length) {
+        // 数据未就绪：清空画布并给出明确提示，避免看起来「图表坏了」
+        svg.innerHTML = '';
+        $('chartSub').textContent = (MODE === 'min') ? '（分时数据加载中…）' : '（数据加载中…）';
+        return;
+      }
       var sz = calcSize(), W = sz.W, H = sz.H, PAD = sz.PAD;
       svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      var fs = (W < 500) ? '13' : '11';   // 窄画布字号相对放大，缩放后仍清晰
       var vs = pts.map(function (p) { return p[1]; });
       var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
       var padV = (mx - mn) * 0.07 || 1;
@@ -463,7 +488,7 @@
         var v = mn + (mx - mn) * t / ticks;
         var y = ny(v);
         s += '<line x1="' + x0 + '" y1="' + y + '" x2="' + x1 + '" y2="' + y + '" stroke="#ffe0f0" stroke-width="1"/>';
-        s += '<text x="' + (x0 - 8) + '" y="' + (y + 4) + '" text-anchor="end" font-size="11" fill="#b8a6c4">' + f2(v) + '</text>';
+        s += '<text x="' + (x0 - 8) + '" y="' + (y + 4) + '" text-anchor="end" font-size="' + fs + '" fill="#b8a6c4">' + f2(v) + '</text>';
       }
 
       // 分档参考线
@@ -472,7 +497,7 @@
         if (v < mn || v > mx) return;
         var y = ny(v);
         s += '<line x1="' + x0 + '" y1="' + y + '" x2="' + x1 + '" y2="' + y + '" stroke="' + r[1] + '" stroke-width="1.2" stroke-dasharray="6 5" opacity="0.85"/>';
-        s += '<text x="' + (x1 + 6) + '" y="' + (y + 4) + '" font-size="11" fill="' + r[1] + '">' + v + ' ' + r[2] + '</text>';
+        s += '<text x="' + (x1 + 6) + '" y="' + (y + 4) + '" font-size="' + fs + '" fill="' + r[1] + '">' + v + ' ' + r[2] + '</text>';
       });
 
       // 面积 + 折线
@@ -493,7 +518,7 @@
         var x = nx(i);
         var label = (MODE === 'min') ? pts[i][0]
                   : (crossYear ? pts[i][0].slice(0, 7) : pts[i][0].slice(5));
-        s += '<text x="' + x + '" y="' + (H - 12) + '" text-anchor="middle" font-size="11" fill="#b8a6c4">' + label + '</text>';
+        s += '<text x="' + x + '" y="' + (H - 12) + '" text-anchor="middle" font-size="' + fs + '" fill="#b8a6c4">' + label + '</text>';
       });
 
       // 悬浮元素
@@ -517,49 +542,67 @@
         sub += (pts.length < rawN ? '，抽样绘制 ' + pts.length + ' 点' : '') + '）';
       }
       $('chartSub').textContent = sub;
+
+      // 若正在查看某点，重绘后沿用同一位置（避免标记消失、提示框悬空）
+      if (lastHoverIdx !== null) applyHover(Math.min(lastHoverIdx, pts.length - 1));
       return pts;
+    }
+
+    /* ---------- 悬停 / 触摸查看数值 ---------- */
+    var lastHoverIdx = null;
+
+    function tooltipText(p) {
+      if (MODE === 'min') {
+        var ses = intraSession();
+        return (ses ? ses.date + ' ' : '') + p[0] + '　' + f2(p[1]) + (p[2] ? '（实时）' : '');
+      }
+      if (MODE === 'week') return p[0] + ' 当周　收 ' + f2(p[1]) + '　高 ' + f2(p[3]) + '　低 ' + f2(p[4]);
+      return p[0] + '　收 ' + f2(p[1]) + '　开 ' + f2(p[2]) + '　高 ' + f2(p[3]) + '　低 ' + f2(p[4]);
+    }
+
+    // 应用第 idx 个点的悬停状态；重绘后也会复用，避免 tooltip 与图上标记脱节
+    function applyHover(idx) {
+      if (!svg._map) return;
+      var map = svg._map, pts = map.pts;
+      if (idx === null || idx === undefined || idx < 0 || idx >= pts.length) { hideHover(); return; }
+      var W = map.W || 820, H = map.H || 320;
+      var rect = svg.getBoundingClientRect();
+      if (!rect.width) return;
+      var p = pts[idx];
+      var x = map.nx(idx), y = map.ny(p[1]);
+      var hl = svg.querySelector('#hoverLine'), hd = svg.querySelector('#hoverDot');
+      if (!hl || !hd) return;
+      hl.setAttribute('x1', x); hl.setAttribute('x2', x); hl.setAttribute('opacity', '0.9');
+      hd.setAttribute('cx', x); hd.setAttribute('cy', y); hd.setAttribute('opacity', '1');
+      var leftPx = x / W * rect.width, topPx = y / H * rect.height;
+      var maxL = Math.max(rect.width - 56, 56);
+      tip.style.left = Math.min(Math.max(leftPx, 56), maxL) + 'px';
+      tip.style.top = Math.max(topPx, 14) + 'px';
+      tip.textContent = tooltipText(p);
+      tip.classList.add('on');
+      lastHoverIdx = idx;
+    }
+
+    function hideHover() {
+      lastHoverIdx = null;
+      tip.classList.remove('on');
+      var hl = svg.querySelector('#hoverLine'), hd = svg.querySelector('#hoverDot');
+      if (hl) hl.setAttribute('opacity', '0');
+      if (hd) hd.setAttribute('opacity', '0');
     }
 
     function onMove(ev) {
       if (!svg._map) return;
       var map = svg._map, pts = map.pts;
-      var W = map.W || 820, H = map.H || 320;
       var rect = svg.getBoundingClientRect();
       if (!rect.width) return;
+      var W = map.W || 820;
       var px = (ev.clientX - rect.left) / rect.width * W;
       if (px < map.x0 - 10 || px > map.x1 + 10) { hideHover(); return; }
       // x 等距，直接算出最近索引
       var best = Math.round((px - map.x0) / (map.x1 - map.x0) * (pts.length - 1));
       best = Math.max(0, Math.min(pts.length - 1, best));
-      var p = pts[best];
-      var x = map.nx(best), y = map.ny(p[1]);
-      var hl = svg.querySelector('#hoverLine'), hd = svg.querySelector('#hoverDot');
-      hl.setAttribute('x1', x); hl.setAttribute('x2', x); hl.setAttribute('opacity', '0.9');
-      hd.setAttribute('cx', x); hd.setAttribute('cy', y); hd.setAttribute('opacity', '1');
-      // tooltip 定位（换算成容器内像素，并限制在容器内避免手机上溢出）
-      var leftPx = x / W * rect.width;
-      var topPx = y / H * rect.height;
-      var txt;
-      if (MODE === 'min') {
-        var ses2 = intraSession();
-        txt = (ses2 ? ses2.date + ' ' : '') + p[0] + '　' + f2(p[1]) + (p[2] ? '（实时）' : '');
-      } else if (MODE === 'week') {
-        txt = p[0] + ' 当周　收 ' + f2(p[1]) + '　高 ' + f2(p[3]) + '　低 ' + f2(p[4]);
-      } else {
-        txt = p[0] + '　收 ' + f2(p[1]) + '　开 ' + f2(p[2]) + '　高 ' + f2(p[3]) + '　低 ' + f2(p[4]);
-      }
-      tip.textContent = txt;
-      var maxL = Math.max(rect.width - 56, 56);
-      tip.style.left = Math.min(Math.max(leftPx, 56), maxL) + 'px';
-      tip.style.top = Math.max(topPx, 14) + 'px';
-      tip.classList.add('on');
-    }
-
-    function hideHover() {
-      tip.classList.remove('on');
-      var hl = svg.querySelector('#hoverLine'), hd = svg.querySelector('#hoverDot');
-      if (hl) hl.setAttribute('opacity', '0');
-      if (hd) hd.setAttribute('opacity', '0');
+      applyHover(best);
     }
 
     wrap.addEventListener('mousemove', onMove);
