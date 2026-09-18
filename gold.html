@@ -85,7 +85,7 @@
 
     header {
       position: sticky; top: 8px; z-index: 5;
-      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
       margin: 8px 14px 0; padding: 8px 12px 8px 16px;
       background: var(--panel);
       border: 2px solid var(--line); border-radius: 999px; box-shadow: var(--shadow);
@@ -98,34 +98,23 @@
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
     .logo-text .crumb { color: var(--muted); font-weight: 700; -webkit-text-fill-color: var(--muted); font-size: 12px; letter-spacing: 0; }
-    .header-right { display: flex; align-items: center; gap: 10px; min-width: 0; }
-    .live-chip {
-      display: inline-flex; align-items: center; gap: 6px;
-      font-size: 11.5px; font-weight: 700; color: var(--muted);
-      background: #fff; border: 2px solid var(--line); border-radius: 999px; padding: 4px 11px;
-      white-space: nowrap; flex: none;
-      transition: color .3s, border-color .3s, background-color .3s;
+    .header-right { display: flex; align-items: center; justify-self: end; min-width: 0; }
+    .clock {
+      font-size: 14px; font-weight: 700; color: var(--muted);
+      font-variant-numeric: tabular-nums; letter-spacing: 1px; white-space: nowrap; flex: none;
     }
-    .live-chip .live-dot { width: 7px; height: 7px; border-radius: 999px; background: #b7a8c4; flex: none; transition: background-color .3s; }
-    .live-chip.on { color: #059669; border-color: #a7f3d0; background: #f0fdf4; }
-    .live-chip.on .live-dot { background: #10b981; animation: livePulse 2s var(--ease-ios) infinite; }
-    @keyframes livePulse {
-      0%   { box-shadow: 0 0 0 0 rgba(16,185,129,.38); }
-      70%  { box-shadow: 0 0 0 6px rgba(16,185,129,0); }
-      100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
-    }
-    .clock { font-size: 13px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; letter-spacing: .5px; white-space: nowrap; flex: none; }
     .nav-links {
-      display: flex; align-items: center; gap: 2px; flex: none;
+      display: flex; align-items: center; gap: 3px; flex: none;
       background: #fff; border: 2px solid var(--line); border-radius: 999px; padding: 3px;
     }
     .nav-links a {
-      padding: 4px 13px; border-radius: 999px; color: var(--muted);
-      font-size: 12.5px; font-weight: 700; text-decoration: none; white-space: nowrap;
+      padding: 6px 19px; border-radius: 999px; color: var(--muted);
+      font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap;
       transition: color .2s var(--spring-soft), background-color .25s var(--spring-soft);
     }
-    .nav-links a:hover { color: var(--accent); }
+    .nav-links a:hover { color: var(--accent); background: #fff0f7; }
     .nav-links a.cur { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff; }
+    .nav-links a.cur:hover { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff; }
 
     main {
       position: relative; z-index: 1; flex: 1;
@@ -213,16 +202,13 @@
 
     @media (max-width: 560px) {
       main { padding: 8px 10px calc(24px + env(safe-area-inset-bottom)); }
-      header { margin: 6px 8px 0; padding: 6px 8px 6px 12px; top: calc(5px + env(safe-area-inset-top)); }
+      header { display: flex; justify-content: space-between; margin: 6px 8px 0; padding: 6px 8px 6px 12px; top: calc(5px + env(safe-area-inset-top)); }
       .logo-text { font-size: 14px; letter-spacing: .5px; }
       .logo-mark { width: 19px; height: 19px; }
-      .logo-text .crumb { font-size: 10.5px; }
-      .header-right { gap: 6px; }
-      .live-chip { padding: 3px 8px; font-size: 10px; gap: 4px; }
-      .live-chip .live-dot { width: 6px; height: 6px; }
+      .logo-text .crumb { display: none; }
       .clock { display: none; }
       .nav-links { padding: 2px; border-width: 1.5px; }
-      .nav-links a { padding: 4px 9px; font-size: 11px; }
+      .nav-links a { padding: 5px 11px; font-size: 11.5px; min-height: 30px; display: inline-flex; align-items: center; }
       .card { padding: 13px; }
       .card + .card { margin-top: 10px; }
       .ov-right { flex-direction: row; align-items: center; justify-content: space-between; width: 100%; gap: 8px; }
@@ -296,15 +282,12 @@
       </svg>
       <span class="logo-text">樱市罗盘<span class="crumb"> · 黄金观测</span></span>
     </div>
+    <span class="clock" id="clock" title="本地时间">--:--:--</span>
     <nav class="header-right">
-      <span class="live-chip" id="liveChip" title="A股交易时段（9:30-11:30 / 13:00-15:00，节假日除外）">
-        <i class="live-dot" id="liveDot"></i><span id="liveTxt">…</span>
-      </span>
-      <span class="clock" id="clock">--:--:--</span>
       <span class="nav-links">
         <a href="./index.html">首页</a>
         <a href="./vix.html">VIX</a>
-        <a href="./fng.html">恐贪</a>
+        <a href="./fng.html">A股恐贪</a>
         <a href="./gold.html" class="cur">黄金</a>
       </span>
     </nav>
@@ -382,19 +365,23 @@
         口径融合 preciousmetalsprices 黄金版、Alternative.me 加密恐贪与韭圈儿 A 股版三者的共同内核
         （动量 + 波动率急升 + 跨资产风险信号），按黄金数据可得性改造：
         <br /><br />
-        <b>6 因子</b>（均为近 3 年滚动分位）：
+        <b>8 因子</b>（除特别说明外均为近 3 年滚动分位）：
         ① 价格动量 <b>×2.0</b>（收盘 vs MA50 偏离，业界共识窗长）　
         ② 波动率急升 <b>×1.2</b>（10日/60日 年化波动率之比，急升=恐慌事件，反向）　
         ③ 金银比 ×1.0（60 日变化，比值飙升=只抱黄金=避险恐惧，反向）　
         ④ 趋势加速度 ×1.0（20 日动量 − 60 日动量，加速上行=贪婪）　
-        ⑤ 距历史高点 ×1.0（距「截至当日」的全史最高价，贴近高点=贪婪，无前视偏差）　
-        ⑥ 美元强弱 ×0.8（EUR/USD 60 日动量，美元走强=压金价=恐惧，反向；数据源不可用时该因子自动缺失降级）
+        ⑤ 距历史高点 ×0.8（距「截至当日」全史最高价的回撤，业界线性刻度而非分位——
+        长牛市中分位法会把正常回调读成极端恐惧；贴高点=贪婪、回撤 10%≈中性、20%≈19）　
+        ⑥ 趋势质量 ×0.8（20 日内收盘在 MA20 上方的天数占比）　
+        ⑦ CFTC 净多头 ×0.8（COMEX 黄金杠杆基金净多头持仓分位，周频，净多高=投机资金看多=贪婪）　
+        ⑧ 美元强弱 ×0.8（EUR/USD 60 日动量，反向；数据源不可用时该因子自动缺失降级）
         <br /><br />
-        黄金现货无公开成交量，量能/融资/估值因子不适用。输出经 <b>3 日 EMA 平滑</b>，降低单日毛刺。
+        黄金现货无公开成交量，量能/融资/估值因子不适用。合成后经 <b>3 日 EMA 平滑</b>，
+        再对平滑序列<b>重取一次滚动分位</b>——否则分布会压缩向 50，大涨期读数也上不了 80。
         价格史：<b>1968–2006</b> 为伦敦金 PM 定盘价（FRED，仅收盘价，图中以价线呈现，K 线蜡烛自 2006 年起），
         <b>2006 至今</b>为伦敦金现 XAU/USD 完整 OHLC。
         <br />分档：0~20 极度恐惧 · 20~40 恐惧 · 40~60 中性 · 60~80 贪婪 · 80~100 极度贪婪。
-        数据来自新浪财经 / FRED（公开接口），模型为自建、仅供参考，不构成投资建议。
+        数据来自新浪财经 / 腾讯外汇 / CFTC 官方（公开接口），模型为自建、仅供参考，不构成投资建议。
       </div>
     </section>
   </main>
@@ -468,20 +455,14 @@
     mk('cs-tl', 130, .12, 24, '#c4b5fd');
   })();
 
-  /* ===== 顶栏时钟 + A股状态 ===== */
+  /* ===== 顶栏时钟 ===== */
   (function () {
-    var chip = document.getElementById('liveChip');
-    var txt = document.getElementById('liveTxt');
     var clock = document.getElementById('clock');
-    if (!chip || !clock || !txt) return;
+    if (!clock) return;
     var pad = function (n) { return (n < 10 ? '0' : '') + n; };
     function tick() {
       var d = new Date();
       clock.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
-      var m = d.getHours() * 60 + d.getMinutes(), wd = d.getDay();
-      var open = wd >= 1 && wd <= 5 && ((m >= 570 && m < 690) || (m >= 780 && m < 900));
-      chip.classList.toggle('on', open);
-      txt.textContent = open ? 'A股交易中' : ((wd === 0 || wd === 6) ? '周末休市' : '已收盘');
     }
     tick();
     setInterval(tick, 1000);
@@ -532,9 +513,10 @@
     var maOn = { MA5: true, MA10: true, MA20: true, MA60: true, MA120: false };
     var PART_NAMES = {
       momentum: '价格动量', accel: '趋势加速度', volSpike: '波动率急升',
-      goldSilver: '金银比', athDist: '距历史高点', usd: '美元强弱'
+      goldSilver: '金银比', athDist: '距历史高点', breadth: '趋势质量',
+      cftc: 'CFTC 净多头', usd: '美元强弱'
     };
-    var PART_KEYS = ['momentum', 'accel', 'volSpike', 'goldSilver', 'athDist', 'usd'];
+    var PART_KEYS = ['momentum', 'accel', 'volSpike', 'goldSilver', 'athDist', 'breadth', 'cftc', 'usd'];
 
     var svg = $('chartSvg'), tip = $('chartTip'), wrap = $('chartWrap');
     var chartRevealed = false, lastHoverIdx = null;
@@ -626,25 +608,19 @@
       return d.toISOString().slice(0, 10);
     }
 
-    /* ---------- MA 预计算（全序列上算，切片后仍有历史窗口） ---------- */
-    function withMA(rows) {
-      var closes = rows.map(function (r) { return r[4]; });
-      MA_DEFS.forEach(function (def) {
-        var arr = new Array(closes.length);
-        var sum = 0;
-        for (var i = 0; i < closes.length; i++) {
-          sum += closes[i];
-          if (i >= def.n) sum -= closes[i - def.n];
-          arr[i] = (i >= def.n - 1) ? sum / def.n : null;
-        }
-        def._vals = arr;
-      });
-      return rows;
-    }
-
+    /* ---------- MA 预计算：在全量序列上算好再切片，任何区间起点都有完整均线 ---------- */
     function series() {
       if (!DATA || !DATA.kline || !DATA.kline.length) return [];
       var all = aggregate(DATA.kline, PERIOD);
+      // r[6+di] = 各周期均线值（基于全量历史，切片后区间起点不缺值）
+      MA_DEFS.forEach(function (def, di) {
+        var sum = 0;
+        for (var i = 0; i < all.length; i++) {
+          sum += all[i][4];
+          if (i >= def.n) sum -= all[i - def.n][4];
+          all[i][6 + di] = (i >= def.n - 1) ? sum / def.n : null;
+        }
+      });
       var out = all;
       if (RANGE) {
         if (RANGE <= 120) {
@@ -693,7 +669,6 @@
         $('chartSub').textContent = '（数据加载中…）';
         return;
       }
-      withMA(p);
       var sz = calcSize(), W = sz.W, H = sz.H, PAD = sz.PAD;
       var fngH = sz.fngH, gap = sz.gap;
       svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
@@ -710,8 +685,9 @@
       p.forEach(function (r, i) {
         lows.push(r[3]);
         highs.push(r[2]);
-        MA_DEFS.forEach(function (def) {
-          if (maOn[def.k] && def._vals[i] != null) { highs.push(def._vals[i]); lows.push(def._vals[i]); }
+        MA_DEFS.forEach(function (def, di) {
+          var mv = r[6 + di];
+          if (maOn[def.k] && mv != null) { highs.push(mv); lows.push(mv); }
         });
       });
       var mn = Math.min.apply(null, lows), mx = Math.max.apply(null, highs);
@@ -773,11 +749,11 @@
       }
 
       // 均线
-      MA_DEFS.forEach(function (def) {
+      MA_DEFS.forEach(function (def, di) {
         if (!maOn[def.k]) return;
         var dstr = '', started = false;
         p.forEach(function (r, i) {
-          var v = def._vals[i];
+          var v = r[6 + di];
           if (v == null) { started = false; return; }
           var x = nx(i), y = ny(v);
           dstr += (started ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
@@ -885,9 +861,9 @@
       // tooltip
       var chg = (r[4] - r[1]) / r[1] * 100;
       var maTxt = '';
-      MA_DEFS.forEach(function (def) {
+      MA_DEFS.forEach(function (def, di) {
         if (!maOn[def.k]) return;
-        var v = def._vals[idx];
+        var v = r[6 + di];
         if (v != null) maTxt += '<br><span style="color:' + def.c + '">●</span> ' + def.k + ' ' + (v >= 1000 ? Math.round(v) : f2(v));
       });
       var body = r[5] === 'p'

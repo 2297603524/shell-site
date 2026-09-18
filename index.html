@@ -105,7 +105,7 @@
     /* ===== 顶栏 ===== */
     header {
       position: sticky; top: 8px; z-index: 5;
-      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
       margin: 8px 14px 0; padding: 8px 12px 8px 16px;
       background: var(--panel);
       border: 2px solid var(--line); border-radius: 999px; box-shadow: var(--shadow);
@@ -117,40 +117,23 @@
       background: linear-gradient(100deg, #ff7eb6 10%, #a78bfa 90%);
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
-    .header-right { display: flex; align-items: center; gap: 10px; min-width: 0; }
-    .live-chip {
-      display: inline-flex; align-items: center; gap: 6px;
-      font-size: 11.5px; font-weight: 700; color: var(--muted);
-      background: #fff; border: 2px solid var(--line); border-radius: 999px; padding: 4px 11px;
-      white-space: nowrap; flex: none;
-      transition: color .3s, border-color .3s, background-color .3s;
-    }
-    .live-chip .live-dot {
-      width: 7px; height: 7px; border-radius: 999px; background: #b7a8c4; flex: none;
-      transition: background-color .3s;
-    }
-    .live-chip.on { color: #059669; border-color: #a7f3d0; background: #f0fdf4; }
-    .live-chip.on .live-dot { background: #10b981; animation: livePulse 2s var(--ease-ios) infinite; }
-    @keyframes livePulse {
-      0%   { box-shadow: 0 0 0 0 rgba(16,185,129,.38); }
-      70%  { box-shadow: 0 0 0 6px rgba(16,185,129,0); }
-      100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
-    }
+    .header-right { display: flex; align-items: center; justify-self: end; min-width: 0; }
     .clock {
-      font-size: 13px; font-weight: 700; color: var(--muted);
-      font-variant-numeric: tabular-nums; letter-spacing: .5px; white-space: nowrap; flex: none;
+      font-size: 14px; font-weight: 700; color: var(--muted);
+      font-variant-numeric: tabular-nums; letter-spacing: 1px; white-space: nowrap; flex: none;
     }
     .nav-links {
-      display: flex; align-items: center; gap: 2px; flex: none;
+      display: flex; align-items: center; gap: 3px; flex: none;
       background: #fff; border: 2px solid var(--line); border-radius: 999px; padding: 3px;
     }
     .nav-links a {
-      padding: 4px 13px; border-radius: 999px; color: var(--muted);
-      font-size: 12.5px; font-weight: 700; text-decoration: none; white-space: nowrap;
+      padding: 6px 19px; border-radius: 999px; color: var(--muted);
+      font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap;
       transition: color .2s var(--spring-soft), background-color .25s var(--spring-soft);
     }
-    .nav-links a:hover { color: var(--accent); }
+    .nav-links a:hover { color: var(--accent); background: #fff0f7; }
     .nav-links a.cur { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff; }
+    .nav-links a.cur:hover { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff; }
 
     main {
       position: relative; z-index: 1; flex: 1;
@@ -305,15 +288,12 @@
     /* ===== 手机端：双列紧凑卡片（一屏可见 4 张） ===== */
     @media (max-width: 640px) {
       main { padding: 10px 10px calc(24px + env(safe-area-inset-bottom)); }
-      header { margin: 6px 8px 0; padding: 6px 8px 6px 12px; top: calc(5px + env(safe-area-inset-top)); }
+      header { display: flex; justify-content: space-between; margin: 6px 8px 0; padding: 6px 8px 6px 12px; top: calc(5px + env(safe-area-inset-top)); }
       .logo-text { font-size: 14px; letter-spacing: .5px; }
       .logo-mark { width: 19px; height: 19px; }
-      .header-right { gap: 6px; }
-      .live-chip { padding: 3px 8px; font-size: 10px; gap: 4px; }
-      .live-chip .live-dot { width: 6px; height: 6px; }
       .clock { display: none; }
       .nav-links { padding: 2px; border-width: 1.5px; }
-      .nav-links a { padding: 4px 9px; font-size: 11px; }
+      .nav-links a { padding: 5px 11px; font-size: 11.5px; min-height: 30px; display: inline-flex; align-items: center; }
       .hero { min-height: 88px; border-width: 2px; border-radius: 12px; margin-bottom: 10px; }
       .wall { grid-template-columns: repeat(2, 1fr); gap: 10px; }
       .tile { aspect-ratio: auto; min-height: 0; padding: 11px 12px; }
@@ -476,15 +456,12 @@
       </svg>
       <span class="logo-text">樱市罗盘</span>
     </div>
+    <span class="clock" id="clock" title="本地时间">--:--:--</span>
     <nav class="header-right">
-      <span class="live-chip" id="liveChip" title="A股交易时段（9:30-11:30 / 13:00-15:00，节假日除外）">
-        <i class="live-dot" id="liveDot"></i><span id="liveTxt">…</span>
-      </span>
-      <span class="clock" id="clock">--:--:--</span>
       <span class="nav-links">
         <a href="./index.html" class="cur">首页</a>
         <a href="./vix.html">VIX</a>
-        <a href="./fng.html">恐贪</a>
+        <a href="./fng.html">A股恐贪</a>
         <a href="./gold.html">黄金</a>
       </span>
     </nav>
@@ -690,20 +667,14 @@
     mk('cs-tl', 130, .12, 24, '#c4b5fd');
   })();
 
-  /* ===== 顶栏：实时时钟 + A股开收盘状态灯 ===== */
+  /* ===== 顶栏时钟 ===== */
   (function () {
-    var chip = document.getElementById('liveChip');
-    var txt = document.getElementById('liveTxt');
     var clock = document.getElementById('clock');
-    if (!chip || !clock || !txt) return;
+    if (!clock) return;
     var pad = function (n) { return (n < 10 ? '0' : '') + n; };
     function tick() {
       var d = new Date();
       clock.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
-      var m = d.getHours() * 60 + d.getMinutes(), wd = d.getDay();
-      var open = wd >= 1 && wd <= 5 && ((m >= 570 && m < 690) || (m >= 780 && m < 900));
-      chip.classList.toggle('on', open);
-      txt.textContent = open ? 'A股交易中' : ((wd === 0 || wd === 6) ? '周末休市' : '已收盘');
     }
     tick();
     setInterval(tick, 1000);
