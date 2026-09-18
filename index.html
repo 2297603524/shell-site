@@ -10,7 +10,7 @@
       --bg-top: #ffe9f5;
       --bg-mid: #f2e9ff;
       --bg-bottom: #e2f2ff;
-      --panel: rgba(255, 255, 255, 0.78);
+      --panel: rgba(255, 255, 255, 0.92);
       --ink: #5a4a66;
       --muted: #9b8aa8;
       --line: #ffd7ec;
@@ -68,7 +68,7 @@
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
       margin: 8px 14px 0; padding: 9px 18px;
       background: var(--panel);
-      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      
       border: 2px solid var(--line); border-radius: 999px; box-shadow: var(--shadow);
       animation: dropIn .6s var(--spring-soft) both;
     }
@@ -105,7 +105,7 @@
     /* ===== 卡片通用 ===== */
     .card {
       background: var(--panel);
-      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      
       border: 2px solid var(--line); border-radius: var(--radius);
       box-shadow: var(--shadow);
     }
@@ -118,6 +118,7 @@
       align-items: stretch;
     }
     .tile {
+      contain: layout style;
       aspect-ratio: 1 / 1;
       min-height: 236px;
       min-width: 0;
@@ -328,12 +329,11 @@
       transition: color var(--dur-base) var(--ease-ios);
     }
 
-    /* 移动端关闭毛玻璃：手机上 backdrop-filter 是最大性能开销（动画/滚动时每帧重算模糊） */
     @media (max-width: 820px), (pointer: coarse) {
       .card, .tile, header, footer, .vix-card, .hero-card, .panel {
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        background: rgba(255, 255, 255, .90) !important;
+        
+        -webkit-
+        background: rgba(255, 255, 255, 0.92) !important;
       }
     }
 
@@ -364,7 +364,7 @@
     /* 入场动画结束后彻底移除动画与合成层占用，避免持续消耗 */
     .tile.settled { animation: none; will-change: auto; }
     /* 桌面毛玻璃减轻（10px → 6px），降低每帧模糊成本 */
-    .card, .tile, header, footer { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+    .card, .tile, header, footer { -webkit-}
 
     @media (prefers-reduced-motion: reduce) {
       ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
@@ -708,7 +708,8 @@
 
     setInterval(function () { if (!backoff) loadAll(); }, REFRESH_MS);   // 正常：5 秒
     setInterval(function () { if (backoff) loadAll(); }, 15000);         // 失败退避：15 秒
-    loadAll();
+    // 首次加载延后到入场动画结束之后：保证开场动画满帧运行，不被数据解析抢主线程
+    setTimeout(loadAll, 650);
   })();
   
   /* ===== iOS 级动效：入场结束后释放合成层 + 数值刷新闪光反馈 ===== */
