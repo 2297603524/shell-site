@@ -35,7 +35,6 @@
       display: flex;
       flex-direction: column;
       background: linear-gradient(180deg, rgba(255,233,245,.78) 0%, rgba(242,233,255,.72) 48%, rgba(226,242,255,.82) 100%);
-      background-attachment: fixed;
       overflow-x: hidden;
       -webkit-tap-highlight-color: transparent;
       -webkit-font-smoothing: antialiased;
@@ -54,8 +53,6 @@
     .sakura {
       position: fixed; top: -40px; z-index: 0; pointer-events: none; user-select: none;
       animation: sakuraFall var(--dur, 14s) linear infinite;
-      will-change: transform, opacity;
-      backface-visibility: hidden;
     }
     .sakura i { display: block; font-style: normal; }
     @keyframes sakuraFall {
@@ -989,6 +986,24 @@
     var show = function () { root.style.opacity = '1'; };
     if (document.readyState === 'complete') { requestAnimationFrame(show); }
     else { window.addEventListener('load', function () { requestAnimationFrame(show); }, { once: true }); }
+  })();
+
+  /* ===== 樱花智能暂停：页面隐藏或滚动时暂停（帧率与省电优先，停止后自动恢复） ===== */
+  (function () {
+    var els = document.querySelectorAll('.sakura');
+    if (!els.length) return;
+    var setAll = function (state) {
+      for (var i = 0; i < els.length; i++) els[i].style.animationPlayState = state;
+    };
+    document.addEventListener('visibilitychange', function () {
+      setAll(document.hidden ? 'paused' : 'running');
+    });
+    var t = null;
+    window.addEventListener('scroll', function () {
+      setAll('paused');
+      clearTimeout(t);
+      t = setTimeout(function () { setAll('running'); }, 280);
+    }, { passive: true });
   })();
 </script>
 </body>
