@@ -59,10 +59,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/vix.json data/vix-history.json data/vix-intraday.json data/indices.json data/fear-greed.json data/gold-fng.json data/gold-prehistory.json data/summary.json
+          git add data/vix.json data/vix-history.json data/vix-intraday.json data/indices.json data/fear-greed.json data/summary.json
+          if [ -f data/gold-fng.json ]; then git add data/gold-fng.json; fi
+          if [ -f data/gold-prehistory.json ]; then git add data/gold-prehistory.json; fi
           if git diff --cached --quiet; then
             echo "数据无变化，跳过提交"
           else
             git commit -m "chore: 更新 VIX 数据 [skip ci]"
+            git pull --rebase origin main
             git push
           fi
