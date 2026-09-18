@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="VIX 恐慌指数详细观测 —— 实时行情、120日走势、区间统计与解读。" />
+  <title>✧ VIX 恐慌指数 · 详细观测 ✧</title>
+  <style>
+    :root {
+      --bg-top: #ffe9f5;
+      --bg-mid: #f2e9ff;
+      --bg-bottom: #e2f2ff;
+      --panel: rgba(255, 255, 255, 0.75);
+      --ink: #5a4a66;
+      --muted: #9b8aa8;
+      --line: #ffd7ec;
+      --accent: #ff7eb6;
+      --accent2: #a78bfa;
+      --shadow: 0 8px 28px rgba(255, 126, 182, 0.18);
+      --radius: 22px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: "Yuanti SC", "YouYuan", "幼圆", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 48%, var(--bg-bottom) 100%);
+      background-attachment: fixed;
+      overflow-x: hidden;
+    }
+
+    /* ===== 樱花 ===== */
+    .sakura { position: fixed; top: -40px; z-index: 0; pointer-events: none; user-select: none; animation: fall linear infinite; }
+    .sakura i { display: block; font-style: normal; animation: sway ease-in-out infinite alternate; }
+    @keyframes fall { to { transform: translateY(110vh) rotate(300deg); } }
+    @keyframes sway { from { transform: translateX(-14px) rotate(-18deg); } to { transform: translateX(14px) rotate(22deg); } }
+    @media (prefers-reduced-motion: reduce) { .sakura { display: none; } }
+
+    /* ===== 顶栏 ===== */
+    header {
+      position: sticky; top: 10px; z-index: 5;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      margin: 10px 16px 0; padding: 12px 22px;
+      background: var(--panel);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 2px solid var(--line); border-radius: 999px; box-shadow: var(--shadow);
+    }
+    .logo {
+      font-weight: 700; font-size: 17px; letter-spacing: 1px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; background-clip: text; color: transparent; white-space: nowrap;
+    }
+    .back {
+      text-decoration: none; color: var(--ink); font-size: 14px; font-weight: 700;
+      background: #fff; border: 2px solid var(--line); border-radius: 999px;
+      padding: 6px 16px; transition: all .2s ease; white-space: nowrap;
+    }
+    .back:hover { border-color: var(--accent); color: var(--accent); transform: translateX(-2px); }
+
+    main {
+      position: relative; z-index: 1; flex: 1;
+      max-width: 980px; width: 100%; margin: 0 auto; padding: 24px 20px 56px;
+    }
+
+    .card {
+      background: var(--panel);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      border: 2px solid var(--line); border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      transition: transform .25s ease, box-shadow .25s ease;
+    }
+    .card + .card { margin-top: 20px; }
+    .card-title { font-weight: 700; font-size: 16px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .card-title .sub { color: var(--muted); font-size: 12px; font-weight: 400; }
+
+    /* ===== 总览 ===== */
+    .overview { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
+    .price-main { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+    .price-big {
+      font-size: clamp(44px, 8vw, 62px); font-weight: 700;
+      font-variant-numeric: tabular-nums; line-height: 1;
+    }
+    .price-chg { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .up   { color: #e11d48; }  /* 涨：红（A股惯例） */
+    .down { color: #0d9488; }  /* 跌：绿 */
+    .flat { color: var(--muted); }
+    .ov-meta { margin-top: 10px; color: var(--muted); font-size: 13px; line-height: 1.9; }
+    .badge {
+      font-size: 13px; padding: 6px 16px; border-radius: 999px;
+      border: 2px solid var(--line); color: var(--muted); background: #fff; white-space: nowrap;
+    }
+    .b-red    { color: #e11d48; border-color: #fecdd3; background: #fff1f2; }
+    .b-orange { color: #d97706; border-color: #fde68a; background: #fffbeb; }
+    .b-green  { color: #0d9488; border-color: #99f6e4; background: #f0fdfa; }
+
+    /* ===== 关键数据 ===== */
+    .kv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-top: 20px; }
+    .kv {
+      background: #fff; border: 2px solid var(--line); border-radius: 14px;
+      padding: 12px 14px; text-align: center;
+    }
+    .kv .k { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    .kv .v { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    /* ===== 图表 ===== */
+    .range-btns { display: flex; gap: 8px; }
+    .rbtn {
+      border: 2px solid var(--line); background: #fff; color: var(--muted);
+      border-radius: 999px; padding: 5px 14px; font-size: 12px; font-weight: 700;
+      cursor: pointer; transition: all .2s ease; font-family: inherit;
+    }
+    .rbtn:hover { color: var(--accent); }
+    .rbtn.on {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      color: #fff; border-color: transparent;
+    }
+    .chart-wrap { position: relative; }
+    .chart-wrap svg { width: 100%; height: auto; display: block; touch-action: pan-y; }
+    .tip {
+      position: absolute; pointer-events: none; opacity: 0;
+      background: rgba(90, 74, 102, 0.92); color: #fff; font-size: 12px;
+      padding: 6px 10px; border-radius: 10px; white-space: nowrap;
+      transform: translate(-50%, -120%); transition: opacity .15s ease; z-index: 2;
+      font-variant-numeric: tabular-nums;
+    }
+    .tip.on { opacity: 1; }
+    .chart-foot { margin-top: 10px; color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+    /* ===== 统计 ===== */
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+    .stat {
+      background: linear-gradient(135deg, #fff, #fff7fc);
+      border: 2px solid var(--line); border-radius: 16px; padding: 14px 16px;
+    }
+    .stat .k { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    .stat .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .stat .d { color: var(--muted); font-size: 11px; margin-top: 4px; }
+    .bar {
+      height: 8px; border-radius: 999px; background: #ffe3f1; margin-top: 10px; overflow: hidden;
+      border: 1px solid var(--line);
+    }
+    .bar i {
+      display: block; height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 999px; transition: width .6s ease;
+    }
+
+    /* ===== 解读表 ===== */
+    .legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+    .lg {
+      border: 2px solid var(--line); border-radius: 16px; padding: 14px 16px;
+      background: #fff;
+    }
+    .lg .t { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+    .lg .n { font-size: 12px; color: var(--muted); line-height: 1.8; }
+    .lg.red    { border-color: #fecdd3; background: #fff5f7; }
+    .lg.orange { border-color: #fde68a; background: #fffbf0; }
+    .lg.gray   { border-color: #efe6f5; background: #fdfaff; }
+    .lg.green  { border-color: #99f6e4; background: #f2fdfb; }
+    .note { margin-top: 14px; color: var(--muted); font-size: 12px; line-height: 1.9; border-top: 2px dashed var(--line); padding-top: 12px; }
+
+    footer {
+      position: relative; z-index: 1; text-align: center; padding: 22px;
+      color: var(--muted); font-size: 13px;
+      background: var(--panel);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      border-top: 2px solid var(--line);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">✧ VIX 详细观测 ✧</div>
+    <a class="back" href="./index.html">← 返回首页</a>
+  </header>
+
+  <main>
+    <!-- 实时总览 -->
+    <section class="card">
+      <div class="overview">
+        <div>
+          <div class="price-main">
+            <span class="price-big flat" id="vixPrice">--.--</span>
+            <span class="price-chg flat" id="vixChg">等待数据…</span>
+          </div>
+          <div class="ov-meta">
+            <div id="vixTime">最后成交：--</div>
+            <div>CBOE 官方数据 · 页面每 1 秒刷新 <span id="vixErr" style="color:#d97706"></span></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end;">
+          <span class="badge" id="vixLevel">观测中…</span>
+          <button class="rbtn" id="vixRefresh" type="button">✧ 立即刷新</button>
+        </div>
+      </div>
+
+      <div class="kv-grid">
+        <div class="kv"><div class="k">开盘</div><div class="v" id="kvOpen">--</div></div>
+        <div class="kv"><div class="k">最高</div><div class="v up" id="kvHigh">--</div></div>
+        <div class="kv"><div class="k">最低</div><div class="v down" id="kvLow">--</div></div>
+        <div class="kv"><div class="k">昨收</div><div class="v" id="kvPrev">--</div></div>
+        <div class="kv"><div class="k">振幅</div><div class="v" id="kvRange">--</div></div>
+        <div class="kv"><div class="k">30日隐含波动率 IV30</div><div class="v" id="kvIv30">--</div></div>
+      </div>
+    </section>
+
+    <!-- 走势图 -->
+    <section class="card">
+      <div class="card-title">
+        📈 收盘走势
+        <span class="sub" id="chartSub">加载中…</span>
+        <span class="range-btns" style="margin-left:auto">
+          <button class="rbtn" data-days="30" type="button">30日</button>
+          <button class="rbtn on" data-days="60" type="button">60日</button>
+          <button class="rbtn" data-days="120" type="button">120日</button>
+        </span>
+      </div>
+      <div class="chart-wrap" id="chartWrap">
+        <div class="tip" id="chartTip"></div>
+        <svg id="chartSvg" viewBox="0 0 820 320" aria-label="VIX 收盘走势图"></svg>
+      </div>
+      <div class="chart-foot">
+        <span>虚线参考：15 平静 / 20 警惕 / 30 恐慌（VIX 绝对值分档）</span>
+        <span id="chartHint">鼠标悬停查看具体数值</span>
+      </div>
+    </section>
+
+    <!-- 区间统计 -->
+    <section class="card">
+      <div class="card-title">📊 近 <span id="statDays">120</span> 个交易日统计 <span class="sub" id="statUpdated"></span></div>
+      <div class="stat-grid">
+        <div class="stat"><div class="k">区间最高</div><div class="v up" id="statHigh">--</div><div class="d" id="statHighD">--</div></div>
+        <div class="stat"><div class="k">区间最低</div><div class="v down" id="statLow">--</div><div class="d" id="statLowD">--</div></div>
+        <div class="stat"><div class="k">区间均值</div><div class="v" id="statAvg">--</div><div class="d">算术平均（收盘价）</div></div>
+        <div class="stat">
+          <div class="k">当前分位</div><div class="v" id="statPct">--</div>
+          <div class="d">低于当前值的交易日占比</div>
+          <div class="bar"><i id="statBar" style="width:0%"></i></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 解读 -->
+    <section class="card">
+      <div class="card-title">🔍 VIX 怎么看</div>
+      <div class="legend">
+        <div class="lg green"><div class="t">＜15 · 市场平静 (´▽`)</div><div class="n">市场情绪乐观，波动预期低。常见于单边上涨或横盘阶段。</div></div>
+        <div class="lg gray"><div class="t">15~20 · 情绪中性 (・_・;)</div><div class="n">正常波动区间，投资者情绪平稳，无明显恐慌或过度乐观。</div></div>
+        <div class="lg orange"><div class="t">20~30 · 恐慌升温 (ﾟДﾟ;)</div><div class="n">不确定性上升，市场开始为下跌风险定价，波动加大。</div></div>
+        <div class="lg red"><div class="t">≥30 · 极度恐慌 (╥﹏╥)</div><div class="n">市场剧烈动荡或危机模式。历史上常伴随急跌，但也可能是阶段性底部区域。</div></div>
+      </div>
+      <div class="note">
+        VIX（CBOE 波动率指数）由标普500 指数期权价格反推得出，衡量市场对未来 30 天年化波动率的预期，常被称为「恐慌指数」。
+        它与股市通常呈负相关：股市跌 → 预期波动升 → VIX 涨。VIX 是**预期**指标而非回顾指标，通常不直接可交易（需通过期货/期权/ETF）。
+        本页数据为 CBOE 延迟行情，仅供参考，不构成投资建议。涨跌配色遵循 A 股惯例（涨红跌绿）。
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    © 2026 SAKURA SHELL · VIX 观测所 · 数据源 CBOE 官方 · 每日自动更新 (´▽`)ﾉ
+  </footer>
+
+  <script>
+  /* ===== 樱花飘落 ===== */
+  (function () {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var COUNT = 16;
+    var GLYPHS = ['🌸', '❀', '✿', '🌸', '❀'];
+    var colors = ['#ffb7d9', '#ffc7e5', '#f5c7ff', '#ffd6ea'];
+    for (var i = 0; i < COUNT; i++) {
+      var s = document.createElement('span');
+      s.className = 'sakura';
+      var size = 10 + Math.random() * 16;
+      var dur = 9 + Math.random() * 10;
+      s.style.left = (Math.random() * 100) + 'vw';
+      s.style.fontSize = size + 'px';
+      s.style.color = colors[Math.floor(Math.random() * colors.length)];
+      s.style.animationDuration = dur + 's';
+      s.style.animationDelay = (-Math.random() * dur) + 's';
+      s.style.opacity = String(0.55 + Math.random() * 0.4);
+      var inner = document.createElement('i');
+      inner.textContent = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+      inner.style.animationDuration = (1.6 + Math.random() * 2) + 's';
+      s.appendChild(inner);
+      document.body.appendChild(s);
+    }
+  })();
+
+  /* ===== VIX 详情 ===== */
+  (function () {
+    'use strict';
+    var REFRESH_SECONDS = 1;
+    var left = 0, busy = false, hasData = false, backoff = false;
+    var HIST = null, RANGE = 60, liveDate = null, lastPlottedPrice = null;
+
+    var $ = function (id) { return document.getElementById(id); };
+    var elPrice = $('vixPrice'), elChg = $('vixChg'), elTime = $('vixTime'), elLevel = $('vixLevel'), elErr = $('vixErr'), elBtn = $('vixRefresh');
+    var svg = $('chartSvg'), tip = $('chartTip'), wrap = $('chartWrap');
+
+    function setCls(el, c) { el.classList.remove('up', 'down', 'flat'); el.classList.add(c); }
+    function f2(n) { return (Math.round(n * 100) / 100).toFixed(2); }
+
+    function levelInfo(v) {
+      if (v >= 30) return ['极度恐慌 ≥30 (╥﹏╥)', 'b-red'];
+      if (v >= 20) return ['恐慌升温 20~30 (ﾟДﾟ;)', 'b-orange'];
+      if (v >= 15) return ['情绪中性 15~20 (・_・;)', ''];
+      return ['市场平静 <15 (´▽`)', 'b-green'];
+    }
+
+    /* ---------- 走势图 ---------- */
+    var PAD = { l: 48, r: 56, t: 18, b: 36 };
+    var W = 820, H = 320;
+
+    function plotPoints() {
+      if (!HIST || !HIST.points || !HIST.points.length) return [];
+      var pts = HIST.points.slice(-RANGE);
+      // 若实时成交日比历史最后一日更新，则追加一个「今日」实时点
+      if (liveDate && lastPlottedPrice !== null) {
+        var lastD = pts[pts.length - 1].d;
+        if (liveDate > lastD) pts = pts.concat([{ d: liveDate, c: lastPlottedPrice, live: true }]);
+        else if (liveDate === lastD) { pts = pts.slice(0, -1).concat([{ d: lastD, c: lastPlottedPrice, live: true }]); }
+      }
+      return pts;
+    }
+
+    function drawChart() {
+      var pts = plotPoints();
+      if (!pts.length) return;
+      var vs = pts.map(function (p) { return p.c; });
+      var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
+      var padV = (mx - mn) * 0.12 || 1;
+      mn -= padV; mx += padV;
+
+      var x0 = PAD.l, x1 = W - PAD.r, y0 = PAD.t, y1 = H - PAD.b;
+      var nx = function (i) { return x0 + (pts.length === 1 ? 0 : i / (pts.length - 1) * (x1 - x0)); };
+      var ny = function (v) { return y1 - (v - mn) / (mx - mn) * (y1 - y0); };
+
+      var s = '<defs>'
+        + '<linearGradient id="lgLine" x1="0" y1="0" x2="1" y2="0">'
+        + '<stop offset="0%" stop-color="#ff7eb6"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient>'
+        + '<linearGradient id="lgArea" x1="0" y1="0" x2="0" y2="1">'
+        + '<stop offset="0%" stop-color="#ff9ecb" stop-opacity="0.35"/>'
+        + '<stop offset="100%" stop-color="#c4b5fd" stop-opacity="0.04"/></linearGradient>'
+        + '</defs>';
+
+      // 横向网格 + y 轴标签
+      var ticks = 5;
+      for (var t = 0; t <= ticks; t++) {
+        var v = mn + (mx - mn) * t / ticks;
+        var y = ny(v);
+        s += '<line x1="' + x0 + '" y1="' + y + '" x2="' + x1 + '" y2="' + y + '" stroke="#ffe0f0" stroke-width="1"/>';
+        s += '<text x="' + (x0 - 8) + '" y="' + (y + 4) + '" text-anchor="end" font-size="11" fill="#b8a6c4">' + f2(v) + '</text>';
+      }
+
+      // 分档参考线
+      [[30, '#fda4af', '恐慌'], [20, '#fcd34d', '警惕'], [15, '#5eead4', '平静']].forEach(function (r) {
+        var v = r[0];
+        if (v < mn || v > mx) return;
+        var y = ny(v);
+        s += '<line x1="' + x0 + '" y1="' + y + '" x2="' + x1 + '" y2="' + y + '" stroke="' + r[1] + '" stroke-width="1.2" stroke-dasharray="6 5" opacity="0.85"/>';
+        s += '<text x="' + (x1 + 6) + '" y="' + (y + 4) + '" font-size="11" fill="' + r[1] + '">' + v + ' ' + r[2] + '</text>';
+      });
+
+      // 面积 + 折线
+      var line = '', area = '';
+      pts.forEach(function (p, i) {
+        var x = nx(i), y = ny(p.c);
+        line += (i === 0 ? 'M' : 'L') + f2(x) + ' ' + f2(y);
+        area += (i === 0 ? 'M' : 'L') + f2(x) + ' ' + f2(y);
+      });
+      area += 'L' + f2(nx(pts.length - 1)) + ' ' + y1 + 'L' + f2(nx(0)) + ' ' + y1 + 'Z';
+      s += '<path d="' + area + '" fill="url(#lgArea)"/>';
+      s += '<path d="' + line + '" fill="none" stroke="url(#lgLine)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>';
+
+      // x 轴日期（首/中/尾）
+      [0, Math.floor((pts.length - 1) / 2), pts.length - 1].forEach(function (i) {
+        if (i < 0) return;
+        var x = nx(i);
+        s += '<text x="' + x + '" y="' + (H - 12) + '" text-anchor="middle" font-size="11" fill="#b8a6c4">' + pts[i].d.slice(5) + '</text>';
+      });
+
+      // 悬浮元素
+      s += '<line id="hoverLine" x1="0" y1="' + y0 + '" x2="0" y2="' + y1 + '" stroke="#c084fc" stroke-width="1.2" stroke-dasharray="4 4" opacity="0"/>';
+      s += '<circle id="hoverDot" r="5" fill="#fff" stroke="#ff7eb6" stroke-width="2.4" opacity="0"/>';
+
+      svg.innerHTML = s;
+
+      // 记录映射供 hover 使用
+      svg._map = { pts: pts, nx: nx, ny: ny, x0: x0, x1: x1 };
+
+      var first = pts[0].d, last = pts[pts.length - 1].d;
+      $('chartSub').textContent = '（' + first + ' ~ ' + last + '，共 ' + pts.length + ' 个交易日）';
+      return pts;
+    }
+
+    function onMove(ev) {
+      if (!svg._map) return;
+      var map = svg._map, pts = map.pts;
+      var rect = svg.getBoundingClientRect();
+      var px = (ev.clientX - rect.left) / rect.width * W;
+      if (px < map.x0 - 10 || px > map.x1 + 10) { hideHover(); return; }
+      // 找最近索引
+      var best = 0, bestD = Infinity;
+      for (var i = 0; i < pts.length; i++) {
+        var d = Math.abs(map.nx(i) - px);
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      var p = pts[best];
+      var x = map.nx(best), y = map.ny(p.c);
+      var hl = svg.querySelector('#hoverLine'), hd = svg.querySelector('#hoverDot');
+      hl.setAttribute('x1', x); hl.setAttribute('x2', x); hl.setAttribute('opacity', '0.9');
+      hd.setAttribute('cx', x); hd.setAttribute('cy', y); hd.setAttribute('opacity', '1');
+      // tooltip 定位（换算成容器内像素）
+      var leftPx = x / W * rect.width;
+      var topPx = y / H * rect.height;
+      tip.textContent = p.d + '　' + f2(p.c) + (p.live ? '（实时）' : '');
+      tip.style.left = leftPx + 'px';
+      tip.style.top = topPx + 'px';
+      tip.classList.add('on');
+    }
+
+    function hideHover() {
+      tip.classList.remove('on');
+      var hl = svg.querySelector('#hoverLine'), hd = svg.querySelector('#hoverDot');
+      if (hl) hl.setAttribute('opacity', '0');
+      if (hd) hd.setAttribute('opacity', '0');
+    }
+
+    wrap.addEventListener('mousemove', onMove);
+    wrap.addEventListener('mouseleave', hideHover);
+
+    document.querySelectorAll('.rbtn[data-days]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('.rbtn[data-days]').forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        RANGE = parseInt(b.getAttribute('data-days'), 10);
+        hideHover();
+        drawChart();
+        renderStats(RANGE);
+      });
+    });
+
+    /* ---------- 统计 ---------- */
+    function renderStats(days) {
+      if (!HIST || !HIST.points) return;
+      var pts = HIST.points.slice(-days);
+      var vs = pts.map(function (p) { return p.c; });
+      var hi = pts[vs.indexOf(Math.max.apply(null, vs))];
+      var lo = pts[vs.indexOf(Math.min.apply(null, vs))];
+      var sum = vs.reduce(function (a, b) { return a + b; }, 0);
+      var avg = sum / vs.length;
+      var cur = HIST.stats && HIST.stats.current ? HIST.stats.current : vs[vs.length - 1];
+      var pct = Math.round(vs.filter(function (v) { return v <= cur; }).length / vs.length * 100);
+      $('statDays').textContent = String(pts.length);
+      $('statUpdated').textContent = '（数据更新：' + (HIST.updated || '--') + '）';
+      $('statHigh').textContent = f2(hi.c);
+      $('statHighD').textContent = hi.d;
+      $('statLow').textContent = f2(lo.c);
+      $('statLowD').textContent = lo.d;
+      $('statAvg').textContent = f2(avg);
+      $('statPct').textContent = pct + '%';
+      $('statBar').style.width = Math.max(2, pct) + '%';
+    }
+
+    /* ---------- 实时数据 ---------- */
+    function renderLive(d) {
+      var price = parseFloat(d.price);
+      var prev = parseFloat(d.prev_close);
+      var chg = parseFloat(d.change);
+      var pct = parseFloat(d.change_percent);
+      if (!isFinite(price) || !isFinite(prev)) throw new Error('bad fields');
+      if (!isFinite(chg)) chg = price - prev;
+      if (!isFinite(pct)) pct = prev ? (chg / prev) * 100 : 0;
+
+      var dirCls = chg > 0 ? 'up' : (chg < 0 ? 'down' : 'flat');
+      setCls(elPrice, dirCls);
+      elPrice.textContent = f2(price);
+      var sign = chg > 0 ? '+' : '';
+      if (chg === 0 && pct === 0) { elChg.textContent = '0.00 (0.00%)'; setCls(elChg, 'flat'); }
+      else { elChg.textContent = sign + f2(chg) + ' (' + sign + f2(pct) + '%)'; setCls(elChg, dirCls); }
+
+      var t = (d.last_trade_time || '').replace('T', ' ');
+      elTime.textContent = '最后成交：' + t + '（美东）';
+      liveDate = (d.last_trade_time || '').slice(0, 10);
+
+      var info = levelInfo(price);
+      elLevel.textContent = info[0];
+      elLevel.className = 'badge ' + info[1];
+
+      $('kvOpen').textContent = f2(parseFloat(d.open));
+      $('kvHigh').textContent = f2(parseFloat(d.high));
+      $('kvLow').textContent = f2(parseFloat(d.low));
+      $('kvPrev').textContent = f2(prev);
+      var hi = parseFloat(d.high), lo = parseFloat(d.low);
+      $('kvRange').textContent = isFinite(hi) && isFinite(lo) && prev ? f2((hi - lo) / prev * 100) + '%' : '--';
+      $('kvIv30').textContent = isFinite(parseFloat(d.iv30)) ? f2(parseFloat(d.iv30)) : '--';
+
+      hasData = true;
+
+      // 价格变化时重绘（让「今日实时点」跟着动）
+      if (lastPlottedPrice !== price) {
+        lastPlottedPrice = price;
+        drawChart();
+      }
+    }
+
+    function loadLive() {
+      if (busy) return;
+      busy = true; backoff = false;
+      elBtn.disabled = true; elBtn.textContent = '刷新中…';
+      fetch('./data/vix.json?r=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (d) { renderLive(d); elErr.textContent = ''; })
+        .catch(function () {
+          backoff = true;
+          elErr.textContent = hasData ? '· ⚠ 数据源暂时不可用，显示上次成功数据' : '· ⚠ 加载失败，稍后重试';
+        })
+        .finally(function () {
+          busy = false; elBtn.disabled = false; elBtn.textContent = '✧ 立即刷新';
+          left = backoff ? Math.max(REFRESH_SECONDS, 10) : REFRESH_SECONDS;
+        });
+    }
+
+    function loadHist() {
+      fetch('./data/vix-history.json?r=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (d) {
+          HIST = d;
+          drawChart();
+          renderStats(RANGE);
+        })
+        .catch(function () {
+          $('chartSub').textContent = '（历史数据加载失败）';
+        });
+    }
+
+    setInterval(function () {
+      if (busy) return;
+      left -= 1;
+      if (left <= 0) { loadLive(); }
+    }, 1000);
+
+    // 历史数据为日频，每 60 秒重取一次即可
+    setInterval(loadHist, 60000);
+
+    elBtn.addEventListener('click', function () { loadLive(); loadHist(); });
+    loadLive();
+    loadHist();
+  })();
+  </script>
+</body>
+</html>

@@ -18,18 +18,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch CBOE VIX and write data/vix.json
+      - name: Fetch CBOE VIX quote and write data/vix.json
         run: |
-          curl -sf --max-time 30 "https://cdn.cboe.com/api/global/delayed_quotes/quotes/_VIX.json" -o /tmp/vix.json || { echo "CBOE fetch failed"; exit 0; }
+          curl -sf --max-time 30 "https://cdn.cboe.com/api/global/delayed_quotes/quotes/_VIX.json" -o /tmp/vix.json || { echo "CBOE quote fetch failed"; exit 0; }
           mkdir -p data
-          jq '{price: .data.current_price, change: .data.price_change, change_percent: .data.price_change_percent, open: .data.open, high: .data.high, low: .data.low, prev_close: .data.prev_day_close, last_trade_time: .data.last_trade_time, fetched_at: .timestamp, source: "CBOE"}' /tmp/vix.json > data/vix.json
+          jq '{price: .data.current_price, change: .data.price_change, change_percent: .data.price_change_percent, open: .data.open, high: .data.high, low: .data.low, prev_close: .data.prev_day_close, iv30: .data.iv30, last_trade_time: .data.last_trade_time, fetched_at: .timestamp, source: "CBOE"}' /tmp/vix.json > data/vix.json
           cat data/vix.json
+
+      - name: Fetch VIX history CSV and build data/vix-history.json
+        run: |
+          curl -sf --max-time 60 "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv" -o /tmp/vixhist.csv || { echo "history fetch failed"; exit 0; }
+          python3 .github/scripts/build_vix_history.py /tmp/vixhist.csv data/vix-history.json
 
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/vix.json
+          git add data/vix.json data/vix-history.json
           if git diff --cached --quiet; then
             echo "数据无变化，跳过提交"
           else

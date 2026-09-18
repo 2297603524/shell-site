@@ -217,6 +217,25 @@
       border-top: 2px dashed var(--line);
       padding-top: 10px;
     }
+    /* ===== 迷你走势 + 详情入口 ===== */
+    .vix-detail {
+      display: block;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 2px dashed var(--line);
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 12px;
+      transition: color .2s ease;
+    }
+    .vix-detail svg { width: 100%; height: 66px; display: block; margin-bottom: 6px; }
+    .vix-detail .go { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .vix-detail .arrow {
+      font-weight: 700; color: var(--accent); white-space: nowrap;
+      transition: transform .2s ease;
+    }
+    .vix-detail:hover { color: var(--ink); }
+    .vix-detail:hover .arrow { transform: translateX(4px); }
 
     /* ===== 占位卡片 ===== */
     .grid {
@@ -293,6 +312,14 @@
           数据源：CBOE 官方（芝加哥期权交易所，VIX 发布方）。GitHub Actions 每 5 分钟自动抓取一次写入本站 data/vix.json，页面每 1 秒读取最新入库数据（若抓取失败自动退避至 10 秒重试）。
           VIX 高于 30 代表市场恐慌情绪升温，低于 15 代表情绪平静；涨跌配色遵循 A 股惯例（涨红跌绿）。
         </div>
+
+        <a class="vix-detail" href="./vix.html">
+          <svg id="spark" viewBox="0 0 800 66" preserveAspectRatio="none" aria-label="VIX 近 30 日走势"></svg>
+          <span class="go">
+            <span id="sparkLabel">近 30 日收盘走势</span>
+            <span class="arrow">查看详细观测 →</span>
+          </span>
+        </a>
       </div>
     </section>
 
@@ -443,6 +470,46 @@
       elCount.textContent = String(left > 0 ? left : 0);
     }
 
+    /* ---------- 迷你走势图 + 详情入口 ---------- */
+    var elSpark = document.getElementById('spark');
+    var elSparkLabel = document.getElementById('sparkLabel');
+
+    function drawSpark(pts) {
+      if (!elSpark || !pts || !pts.length) return;
+      var W = 800, H = 66, pl = 3, pr = 3, pt = 10, pb = 10;
+      var vs = pts.map(function (p) { return p.c; });
+      var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
+      if (mx === mn) { mx += 1; mn -= 1; }
+      var pad = (mx - mn) * 0.12; mn -= pad; mx += pad;
+      var nx = function (i) { return pl + (pts.length === 1 ? 0 : i / (pts.length - 1) * (W - pl - pr)); };
+      var ny = function (v) { return H - pb - (v - mn) / (mx - mn) * (H - pt - pb); };
+      var line = '', area = '';
+      pts.forEach(function (p, i) {
+        var x = nx(i).toFixed(1), y = ny(p.c).toFixed(1);
+        line += (i ? 'L' : 'M') + x + ' ' + y;
+        area += (i ? 'L' : 'M') + x + ' ' + y;
+      });
+      area += 'L' + nx(pts.length - 1).toFixed(1) + ' ' + H + 'L' + nx(0).toFixed(1) + ' ' + H + 'Z';
+      elSpark.innerHTML =
+        '<defs><linearGradient id="spLine" x1="0" y1="0" x2="1" y2="0">' +
+        '<stop offset="0%" stop-color="#ff7eb6"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient>' +
+        '<linearGradient id="spArea" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0%" stop-color="#ff9ecb" stop-opacity="0.32"/>' +
+        '<stop offset="100%" stop-color="#c4b5fd" stop-opacity="0.03"/></linearGradient></defs>' +
+        '<path d="' + area + '" fill="url(#spArea)"/>' +
+        '<path d="' + line + '" fill="none" stroke="url(#spLine)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>';
+      if (elSparkLabel) {
+        elSparkLabel.textContent = '近 30 日收盘走势（' + pts[0].d + ' ~ ' + pts[pts.length - 1].d + '）';
+      }
+    }
+
+    function loadSpark() {
+      fetch('./data/vix-history.json?r=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (d) { if (d && d.points && d.points.length) drawSpark(d.points.slice(-30)); })
+        .catch(function () {});
+    }
+
     timer = setInterval(function () {
       if (busy) return;
       left -= 1;
@@ -453,6 +520,8 @@
     left = REFRESH_SECONDS;
     updateCountdown();
     load();
+    loadSpark();
+    setInterval(loadSpark, 60000);  // 历史为日频数据，每分钟重取一次即可
   })();
   </script>
 </body>
