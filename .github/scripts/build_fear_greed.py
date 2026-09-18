@@ -372,13 +372,20 @@ def sample_rows(rows, recent=RECENT_DAYS):
     return idx
 
 
-def compute(dates, closes, vols, margin_by_date, small, large, val_by_month):
+def compute(dates, closes, vols, margin_by_date, small, large, val_by_month, risk_pair=None):
+    # 风险偏好基准特异化：板块类（如黄金股）传 risk_pair=(基准A收盘, 基准B收盘)，
+    # 即「自身 vs 沪深300」的相对强弱；宽基类不传，用默认的「中证1000 vs 沪深300」
+    if risk_pair:
+        small = dict(zip(risk_pair[0], risk_pair[1]))
+        large = dict(zip(risk_pair[0], risk_pair[2]))
     rows = build_rows(dates, closes, vols, margin_by_date, small, large, val_by_month)
     if not rows:
         return None
     rows = score_rows(rows)
     if len(rows) < 30:
         return None
+    if len(rows) > 210:
+        rows = rows[60:]           # 冷启动分位不可靠：序列开头的窗口未满，读数虚高/虚低
 
     sel = sample_rows(rows)
     daily_from = len(rows) - RECENT_DAYS
@@ -413,8 +420,12 @@ def main() -> None:
             continue
 
         vcode = VAL_MAP.get(name) or VAL_MAP.get(label)
+        rp = None
+        if label == "黄金股":                      # 板块类：风险偏好 = 自身 vs 沪深300
+            l_map = dict(zip(l_dates, l_closes))
+            rp = (dates, closes, [l_map.get(d) for d in dates])
         res = compute(dates, closes, vols, margin_map, small_map, large_map,
-                      val_raw.get(vcode) if vcode else None)
+                      val_raw.get(vcode) if vcode else None, rp)
         if not res:
             print("skip %s: not enough data" % name)
             continue
