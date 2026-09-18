@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description" content="A股各指数恐贪指数 —— 上证、深证、创业板、沪深300、中证500、上证50、科创50 情绪一览。" />
   <title>A股各指数恐贪 · 樱市罗盘</title>
+  <meta name="theme-color" content="#ffe9f5" />
+  <meta property="og:title" content="A股各指数恐贪 · 樱市罗盘" />
+  <meta property="og:description" content="上证、深证、创业板、沪深300、中证500、上证50、科创50、黄金股情绪一览" />
+  <meta property="og:type" content="website" />
   <style>
     :root {
       --bg-top: #ffe9f5;
@@ -206,6 +210,8 @@
       .part-name { width: 68px; font-size: 11px; }
       .part-val { width: 40px; font-size: 12px; }
       .card-title { font-size: 14px; }
+      /* 触控目标 ≥36px（iOS HIG） */
+      .btn, .rbtn, .back { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; }
     }
 
     /* Chrome 支持 linear() 时，用真·弹簧曲线（更接近 iOS UISpringTimingParameters） */
@@ -800,13 +806,25 @@
 
     wrap.addEventListener('mousemove', onMove);
     wrap.addEventListener('mouseleave', hideHover);
+    var tStart = null;
     wrap.addEventListener('touchstart', function (e) {
-      if (e.touches[0]) { e.preventDefault(); onMove(e.touches[0]); }
-    }, { passive: false });   // preventDefault：阻止文本选择与放大镜
+      if (e.touches[0]) tStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, locked: false };
+    }, { passive: true });
     wrap.addEventListener('touchmove', function (e) {
-      if (e.touches[0]) { e.preventDefault(); onMove(e.touches[0]); }
+      if (!e.touches[0] || !tStart) return;
+      var dx = e.touches[0].clientX - tStart.x;
+      var dy = e.touches[0].clientY - tStart.y;
+      if (!tStart.locked) {
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) tStart.locked = 'h';   /* 水平意图 */
+        else if (Math.abs(dy) > 6) tStart.locked = 'v';                             /* 垂直意图 */
+      }
+      if (tStart.locked === 'h') {
+        e.preventDefault();                    /* 水平滑动：接管，查看数值 */
+        onMove(e.touches[0]);
+      }
+      /* 垂直滑动：放行给浏览器滚动页面 */
     }, { passive: false });
-    wrap.addEventListener('touchend', hideHover);
+    wrap.addEventListener('touchend', function () { tStart = null; hideHover(); });
 
     var rsTimer = null;
     window.addEventListener('resize', function () {
