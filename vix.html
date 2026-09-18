@@ -89,7 +89,9 @@
     .card-title .sub { color: var(--muted); font-size: 12px; font-weight: 400; }
 
     /* ===== 总览 ===== */
-    .overview { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
+    .overview { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+    .ov-left { flex: 1 1 auto; min-width: 0; }
+    .ov-right { display: flex; flex-direction: column; gap: 10px; align-items: flex-end; flex: none; }
     .price-main { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
     .price-big {
       font-size: clamp(44px, 8vw, 62px); font-weight: 700;
@@ -205,27 +207,44 @@
       .rbtn:hover { color: var(--muted); }
       .back:hover { transform: none; border-color: var(--line); color: var(--ink); }
     }
-    @media (max-width: 480px) {
-      main { padding: 12px 12px calc(28px + env(safe-area-inset-bottom)); }
-      header { margin: 8px 8px 0; padding: 8px 14px; top: calc(6px + env(safe-area-inset-top)); }
-      .logo { font-size: 14px; }
-      .back { padding: 8px 14px; font-size: 13px; }
-      .card { padding: 15px; }
-      .price-main { gap: 10px; }
-      .price-chg { font-size: 16px; }
-      .badge { font-size: 12px; padding: 5px 12px; }
-      /* 触控目标放大 */
-      .rbtn { padding: 8px 13px; font-size: 12px; }
-      .kv-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 14px; }
-      .kv { padding: 10px 8px; border-radius: 12px; }
-      .kv .k { font-size: 11px; }
-      .kv .v { font-size: 16px; }
-      .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-      .stat { padding: 12px; }
+    @media (max-width: 560px) {
+      main { padding: 8px 10px calc(24px + env(safe-area-inset-bottom)); }
+      header { margin: 6px 8px 0; padding: 7px 13px; top: calc(5px + env(safe-area-inset-top)); }
+      .logo { font-size: 13px; }
+      .back { padding: 7px 13px; font-size: 13px; }
+      .card { padding: 13px; }
+      .card + .card { margin-top: 12px; }
+
+      /* 总览：徽章与刷新按钮并排占满一行，省下两行高度 */
+      .ov-right { flex-direction: row; align-items: center; justify-content: space-between; width: 100%; gap: 8px; }
+      .price-main { gap: 10px; flex-wrap: wrap; }
+      .price-big { font-size: 44px; }
+      .price-chg { font-size: 15px; }
+      .badge { font-size: 12px; padding: 5px 11px; }
+      .ov-meta { font-size: 11.5px; line-height: 1.6; }
+      .rbtn { padding: 7px 12px; font-size: 12px; }
+
+      /* 关键数据：更紧凑的两列 */
+      .kv-grid { grid-template-columns: repeat(2, 1fr); gap: 7px; margin-top: 12px; }
+      .kv { padding: 9px 6px; border-radius: 12px; }
+      .kv .k { font-size: 10.5px; margin-bottom: 4px; }
+      .kv .v { font-size: 15px; }
+
+      .card-title { font-size: 15px; }
+      .card-title .sub { font-size: 11px; }
+      .ctrl-row { gap: 8px 10px; margin-bottom: 10px; }
+      .ctrl-lbl { font-size: 11px; padding: 2px 6px; }
+      .seg .rbtn { min-width: 52px; }
+      /* 区间按钮更小，保证 6 个能在手机上一行排下 */
+      .range-btns { gap: 6px; }
+      .range-btns .rbtn { padding: 6px 9px; font-size: 11px; }
+
+      .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 7px; }
+      .stat { padding: 10px; }
+      .stat .v { font-size: 17px; }
       .legend { grid-template-columns: 1fr; }
       .chart-foot { font-size: 11px; }
       .tip { font-size: 11px; padding: 5px 8px; }
-      .ov-meta { font-size: 12px; }
     }
   </style>
 </head>
@@ -239,7 +258,7 @@
     <!-- 实时总览 -->
     <section class="card">
       <div class="overview">
-        <div>
+        <div class="ov-left">
           <div class="price-main">
             <span class="price-big flat" id="vixPrice">--.--</span>
             <span class="price-chg flat" id="vixChg">等待数据…</span>
@@ -249,7 +268,7 @@
             <div>CBOE 官方数据 · 页面每 1 秒刷新 <span id="vixErr" style="color:#d97706"></span></div>
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end;">
+        <div class="ov-right">
           <span class="badge" id="vixLevel">观测中…</span>
           <button class="rbtn" id="vixRefresh" type="button">✧ 立即刷新</button>
         </div>
@@ -520,14 +539,18 @@
       s += '<path d="' + area + '" fill="url(#lgArea)"/>';
       s += '<path d="' + line + '" fill="none" stroke="url(#lgLine)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>';
 
-      // x 轴标签（首/中/尾）：分时显示时刻；日期型跨年显示年-月，年内显示月-日
+      // x 轴标签（首/中/尾）：首尾用 start/end 对齐，避免贴边被裁
       var crossYear = pts[0][0].slice(0, 4) !== pts[pts.length - 1][0].slice(0, 4);
+      var xIdx = [];
       [0, Math.floor((pts.length - 1) / 2), pts.length - 1].forEach(function (i) {
-        if (i < 0) return;
+        if (i >= 0 && xIdx.indexOf(i) === -1) xIdx.push(i);
+      });
+      xIdx.forEach(function (i, k) {
         var x = nx(i);
+        var anchor = (k === 0) ? 'start' : (k === xIdx.length - 1 ? 'end' : 'middle');
         var label = (MODE === 'min') ? pts[i][0]
                   : (crossYear ? pts[i][0].slice(0, 7) : pts[i][0].slice(5));
-        s += '<text x="' + x + '" y="' + (H - 12) + '" text-anchor="middle" font-size="' + fs + '" fill="#b8a6c4">' + label + '</text>';
+        s += '<text x="' + f2(x) + '" y="' + (H - 12) + '" text-anchor="' + anchor + '" font-size="' + fs + '" fill="#b8a6c4">' + label + '</text>';
       });
 
       // 悬浮元素
