@@ -218,7 +218,7 @@
         <svg id="chartSvg" viewBox="0 0 820 300" aria-label="恐贪指数走势"></svg>
       </div>
       <div class="chart-foot">
-        <span>虚线：20 / 40 / 60 / 80 情绪分档；纵轴固定 0~100，便于各指数横向比较</span>
+        <span>左轴：恐贪指数 0~100（20/40/60/80 为情绪分档）　灰色虚线：指数点位（右轴）</span>
         <span>悬停或滑动图表查看数值</span>
       </div>
     </section>
@@ -363,9 +363,9 @@
     /* ---------- 走势图（纵轴固定 0~100） ---------- */
     function calcSize() {
       var cw = wrap.clientWidth || 820;
-      if (cw < 460) return { W: 400, H: 280, PAD: { l: 36, r: 40, t: 16, b: 30 } };
-      if (cw < 700) return { W: 620, H: 290, PAD: { l: 42, r: 46, t: 17, b: 32 } };
-      return { W: 820, H: 300, PAD: { l: 46, r: 52, t: 18, b: 34 } };
+      if (cw < 460) return { W: 400, H: 280, PAD: { l: 36, r: 50, t: 16, b: 30 } };
+      if (cw < 700) return { W: 620, H: 290, PAD: { l: 42, r: 58, t: 17, b: 32 } };
+      return { W: 820, H: 300, PAD: { l: 46, r: 66, t: 18, b: 34 } };
     }
 
     function pts() {
@@ -403,6 +403,32 @@
         s += '<text x="' + (x0 - 6) + '" y="' + (y + 4) + '" text-anchor="end" font-size="' + fs + '" fill="#b8a6c4">' + v + '</text>';
       });
 
+      // 指数点位对照线（右轴，灰色虚线）
+      var priceVals = [];
+      p.forEach(function (x) { if (isFinite(x[2])) priceVals.push(x[2]); });
+      if (priceVals.length > 1) {
+        var pmn = Math.min.apply(null, priceVals), pmx = Math.max.apply(null, priceVals);
+        var ppad = (pmx - pmn) * 0.06 || 1;
+        pmn -= ppad; pmx += ppad;
+        var pny = function (v) { return y1 - (v - pmn) / (pmx - pmn) * (y1 - y0); };
+        var pline = '';
+        p.forEach(function (x, i) {
+          if (!isFinite(x[2])) return;
+          pline += (pline ? 'L' : 'M') + nx(i).toFixed(1) + ' ' + pny(x[2]).toFixed(1);
+        });
+        s += '<path d="' + pline + '" fill="none" stroke="#8ea6c4" stroke-width="1.5"'
+          + ' stroke-dasharray="5 4" opacity="0.95"/>';
+        [0, 0.5, 1].forEach(function (t) {
+          var v = pmn + (pmx - pmn) * t;
+          var txt = Math.abs(v) >= 1000
+            ? Math.round(v).toLocaleString('en-US')
+            : Math.round(v).toString();
+          s += '<text x="' + (x1 + 6) + '" y="' + (pny(v) + 4) + '" font-size="' + fs
+            + '" fill="#8ea6c4">' + txt + '</text>';
+        });
+      }
+
+      // 恐贪指数折线 + 面积
       var line = '', area = '';
       p.forEach(function (it, i) {
         var x = nx(i).toFixed(1), y = ny(it[1]).toFixed(1);
@@ -450,7 +476,12 @@
       var maxL = Math.max(rect.width - 56, 56);
       tip.style.left = Math.min(Math.max(leftPx, 56), maxL) + 'px';
       tip.style.top = Math.max(topPx, 14) + 'px';
-      tip.textContent = p[idx][0] + '　' + f1(p[idx][1]);
+      var priceTxt = isFinite(p[idx][2])
+        ? '　点位 ' + (Math.abs(p[idx][2]) >= 1000
+          ? Number(p[idx][2]).toLocaleString('en-US', { maximumFractionDigits: 2 })
+          : p[idx][2])
+        : '';
+      tip.textContent = p[idx][0] + '　恐贪 ' + f1(p[idx][1]) + priceTxt;
       tip.classList.add('on');
       lastHoverIdx = idx;
     }

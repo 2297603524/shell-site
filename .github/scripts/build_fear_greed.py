@@ -305,7 +305,8 @@ def compute(dates, closes, vols, margin_by_date, small, large, val_by_month):
     last = len(idx) - 1
     rating, rating_cn = rating_of(scores[last])
     parts = {k: round(ranks[i][last], 1) for i, k in enumerate(part_names)}
-    points = [[dates[idx[j]], scores[j]] for j in range(max(0, len(idx) - KEEP_DAYS), len(idx))]
+    points = [[dates[idx[j]], scores[j], round(closes[idx[j]], 2)]
+              for j in range(max(0, len(idx) - KEEP_DAYS), len(idx))]
     return scores[last], rating, rating_cn, parts, points, dates[idx[last]]
 
 
