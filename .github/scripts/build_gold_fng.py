@@ -17,15 +17,16 @@
     ③ 金银比    ×1.0  金银比 60 日变化，反向（比值飙升=只抱黄金=避险恐惧）
     ④ 趋势加速度 ×1.0  20 日动量 − 60 日动量（加速上行=贪婪）
     ⑤ 距历史高点 ×1.0  收盘距「截至当日」的全史最高价（贴近高点=贪婪，无前视偏差）
-    ⑥ 美元强弱  ×0.8  EUR/USD（FRED DEXUSEU）60 日动量，反向（美元强=压金价=恐惧）
-       —— FRED 不可用时该因子自动缺失降级。
+    ⑥ 美元强弱  ×0.8  EUR/USD（腾讯外汇）60 日动量，反向（美元强=压金价=恐惧）
+       —— 数据源不可用时该因子自动缺失降级。
     黄金现货无公开成交量，量能/融资/估值因子不适用。
 
 数据源（全部免密钥）:
     伦敦金现 OHLC: 新浪 XAU（2006-09 起，约 5200 日）
     伦敦银现 OHLC: 新浪 XAG（2006-09 起，与 XAU 同区间）→ 金银比
-    美元:          FRED DEXUSEU（EUR/USD 日频，可选）
+    美元:          腾讯外汇 whEURUSD（EUR/USD 近 900 日）
     K 线前史:      FRED GOLDPMGBD228NLBM（1968-04 起伦敦金 PM 定盘价，仅收盘价 → 粒度 "p"）
+                   首次成功抓取后缓存为 data/gold-prehistory.json，此后零网络开销
 
 输出:
     points: [[date, score, close, n, grain], ...]  grain: d=日线 | m=月线 | p=定盘价月线
@@ -47,6 +48,7 @@ UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 
 SINA_KLINE = ("https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%%20t=/"
               "GlobalFuturesService.getGlobalFuturesDailyKLine?symbol=%s")
+TX_FX = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=whEURUSD,day,,,900,qfq"
 FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=%s"
 
 WINDOW = 750          # 分位窗口 = 近 3 年
@@ -107,26 +109,52 @@ def fetch_sina(sym):
     return days
 
 
-def fetch_fred(fid):
-    """FRED CSV：[(date, close)]；缺失 "." 丢弃；失败返回 []（调用方降级）"""
-    try:
-        text = _get(FRED_CSV % fid, timeout=60).decode("utf-8", "ignore")
-    except Exception as e:  # noqa: BLE001
-        print("   FRED %s 不可用（相关因子降级）: %s" % (fid, e))
-        return []
-    out = []
-    for ln in text.strip().splitlines()[1:]:
-        parts = ln.split(",")
-        if len(parts) < 2 or not parts[1] or parts[1] == ".":
-            continue
+def fetch_fred(fid, timeout=12, retries=2):
+    """FRED CSV：[(date, close)]；缺失 "." 丢弃；失败返回 []（调用方降级）。
+    短超时 + 少重试：FRED 不可达时不能拖慢整条数据流水线"""
+    for attempt in range(retries):
         try:
-            v = float(parts[1])
-        except ValueError:
-            continue
-        if v > 0:
-            out.append((parts[0], v))
-    print("   FRED %s: %d 条（%s ~ %s）" % (fid, len(out), out[0][0] if out else "-", out[-1][0] if out else "-"))
-    return out
+            text = _get(FRED_CSV % fid, timeout=timeout).decode("utf-8", "ignore")
+            out = []
+            for ln in text.strip().splitlines()[1:]:
+                parts = ln.split(",")
+                if len(parts) < 2 or not parts[1] or parts[1] == ".":
+                    continue
+                try:
+                    v = float(parts[1])
+                except ValueError:
+                    continue
+                if v > 0:
+                    out.append((parts[0], v))
+            print("   FRED %s: %d 条（%s ~ %s）" % (fid, len(out),
+                  out[0][0] if out else "-", out[-1][0] if out else "-"))
+            return out
+        except Exception as e:  # noqa: BLE001
+            if attempt == retries - 1:
+                print("   FRED %s 不可用（相关因子降级）: %s" % (fid, e))
+                return []
+            time.sleep(1)
+
+
+def fetch_fx_eurusd():
+    """腾讯外汇 EUR/USD 日K（近 900 根 ≈ 3.5 年）→ {date: close}，供美元因子"""
+    try:
+        data = json.loads(_get(TX_FX, timeout=30,
+                               headers={"Referer": "https://gu.qq.com/"}).decode("utf-8", "ignore"))
+        node = (data.get("data") or {}).get("whEURUSD") or {}
+        rows = node.get("qfqday") or node.get("day") or []
+        out = {}
+        for r in rows:
+            try:
+                if len(r) > 2 and float(r[2]) > 0:
+                    out[r[0]] = float(r[2])
+            except (TypeError, ValueError):
+                continue
+        print("   腾讯外汇 EUR/USD: %d 个交易日" % len(out))
+        return out
+    except Exception as e:  # noqa: BLE001
+        print("   腾讯外汇不可用（美元因子降级）: %s" % e)
+        return {}
 
 
 def align_map(dates, value_map):
@@ -315,10 +343,30 @@ def main():
     xag_days = fetch_sina("XAG")
     xag_map = {d[0]: d[4] for d in xag_days}
 
-    print("抓取 FRED（美元 + 定盘价前史）…")
-    usd = fetch_fred("DEXUSEU")
-    usd_by_date = dict(usd)
-    pre = fetch_fred("GOLDPMGBD228NLBM")
+    print("抓取美元（腾讯外汇 EUR/USD）…")
+    usd_by_date = fetch_fx_eurusd()
+
+    # 定盘价前史：1968-2006 的月度数据永不变化 → 一次性抓取后缓存为静态文件，之后零网络开销
+    pre_file = os.path.join(os.path.dirname(dst) or ".", "gold-prehistory.json")
+    pre = []
+    if os.path.exists(pre_file):
+        try:
+            with open(pre_file, encoding="utf-8") as f:
+                pre = [(r[0], r[1]) for r in json.load(f)]
+            print("   定盘价前史（缓存）: %d 月（%s ~ %s）" % (len(pre), pre[0][0], pre[-1][0]))
+        except Exception:  # noqa: BLE001
+            pre = []
+    if not pre:
+        print("抓取 FRED 定盘价前史（首次）…")
+        pre = fetch_fred("GOLDPMGBD228NLBM")
+        if pre:
+            monthly = {}
+            for d, c in pre:
+                monthly[d[:7]] = [d, c]           # 每月最后一条
+            save = sorted(monthly.values())
+            with open(pre_file, "w", encoding="utf-8") as f:
+                json.dump(save, f, ensure_ascii=False, separators=(",", ":"))
+            print("   前史已缓存 → %s（%d 月）" % (pre_file, len(save)))
     xau_start = days[0][0]
     pre_history = [(d, c) for d, c in pre if d < xau_start]
 
@@ -354,7 +402,7 @@ def main():
         "priceStart": xau_start,
         "preHistoryFrom": pre_history[0][0] if pre_history else "",
         "nParts": len(parts),
-        "source": "新浪财经 XAU/XAG（OHLC）+ FRED（美元、1968 起定盘价前史）",
+        "source": "新浪财经 XAU/XAG（OHLC）+ 腾讯外汇 EUR/USD + FRED 定盘价前史",
         "model": ("黄金版 6 因子加权合成（动量2.0 / 波动率急升1.2 / 金银比1.0 / 趋势加速度1.0 / "
                   "距历史高点1.0 / 美元0.8，FRED 不可用时美元因子自动缺失）；"
                   "均为近 3 年滚动分位，输出经 3 日 EMA 平滑；"

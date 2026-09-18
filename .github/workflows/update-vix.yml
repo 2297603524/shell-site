@@ -59,7 +59,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/vix.json data/vix-history.json data/vix-intraday.json data/indices.json data/fear-greed.json data/gold-fng.json data/summary.json
+          git add data/vix.json data/vix-history.json data/vix-intraday.json data/indices.json data/fear-greed.json data/gold-fng.json data/gold-prehistory.json data/summary.json
           if git diff --cached --quiet; then
             echo "数据无变化，跳过提交"
           else
