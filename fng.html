@@ -193,7 +193,7 @@
           </div>
           <div class="ov-meta">
             <div id="curName">--</div>
-            <div>8 分项多维合成 · 数据每日收盘后自动更新 <span id="curErr" style="color:#d97706"></span></div>
+            <div><span id="partCount">9</span> 分项多维合成 · 数据每日收盘后自动更新 <span id="curErr" style="color:#d97706"></span></div>
           </div>
         </div>
         <div class="ov-right">
@@ -227,8 +227,8 @@
     <section class="card">
       <div class="card-title">🔍 这个指数怎么算的</div>
       <div class="note" id="modelNote">
-        共 <b>8 个分项</b>，各自取<b>近 3 年（750 个交易日）</b>滚动分位（0~100）后等权平均；
-        其中 6 项随各指数走势独立计算，2 项（融资、风险偏好）是全市场共享的情绪维度：
+        共 <b>9 个分项</b>：价格与估值类随各指数独立计算、市场类（融资/风险偏好）为全市场共享。
+        价格类各取<b>近 3 年（750 交易日）</b>滚动分位，估值取<b>近 60 个月</b> PE 分位，最后等权平均（0~100）：
         <br />① <b>价格动量</b>：收盘价相对 125 日均线的偏离度
         <br />② <b>短期趋势</b>：近 20 个交易日涨跌幅
         <br />③ <b>均线广度</b>：近 20 日内「收盘价站上 MA20」的天数占比
@@ -237,9 +237,12 @@
         <br />⑥ <b>融资热度</b>（全市场）：融资买入额相对 20 日均值的偏离度，加杠杆越猛越贪婪
         <br />⑦ <b>风险偏好</b>（全市场）：中证1000 与沪深300 近 60 日相对强弱，小盘越强说明风险偏好越高
         <br />⑧ <b>回撤深度</b>：收盘价距近 250 个交易日高点的回撤，越接近新高越贪婪
+        <br />⑨ <b>估值分位</b>：指数 PE(TTM) 在近 60 个月中的分位，估值越贵越贪婪
         <br /><br />
         分档：0~20 极度恐惧 · 20~40 恐惧 · 40~60 中性 · 60~80 贪婪 · 80~100 极度贪婪。
-        价格数据来自公开行情接口（东方财富 / 腾讯，自动容错），融资数据来自东方财富数据中心。
+        估值采用同风格代表指数（上证指数→上证180、深证成指→深证100、创业板指/科创50→创业板50、
+        其余用同名指数）的 PE-TTM 历史，数据来自乐咕乐股。
+        行情数据来自东方财富 / 腾讯（自动容错），融资数据来自东方财富数据中心。
         模型为自建、算法透明，仅供参考，不构成投资建议。
       </div>
     </section>
@@ -282,9 +285,10 @@
     var PART_NAMES = {
       momentum: '价格动量', trend: '短期趋势', breadth: '均线广度',
       volatility: '波动率', volume: '量能热度', margin: '融资热度',
-      riskon: '风险偏好', drawdown: '回撤深度'
+      riskon: '风险偏好', drawdown: '回撤深度', valuation: '估值分位'
     };
-    var PART_KEYS = ['momentum', 'trend', 'breadth', 'volatility', 'volume', 'margin', 'riskon', 'drawdown'];
+    var PART_KEYS = ['momentum', 'trend', 'breadth', 'volatility', 'volume',
+                     'margin', 'riskon', 'drawdown', 'valuation'];
 
     var svg = $('chartSvg'), tip = $('chartTip'), wrap = $('chartWrap');
     var lastHoverIdx = null;
@@ -313,6 +317,8 @@
       $('curName').textContent = it.name + ' · ' + DATA.date;
       $('curMark').style.left = Math.max(1, Math.min(99, s)) + '%';
       $('asOf').textContent = '（数据 ' + (DATA.date || '--') + '）';
+      var pnum = it.parts ? Object.keys(it.parts).length : 0;
+      if (pnum && $('partCount')) $('partCount').textContent = String(pnum);
 
       var pts = it.points || [];
       if (pts.length > 6) {

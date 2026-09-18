@@ -140,7 +140,7 @@
     .spark-link .cap { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; margin-top: 3px; flex-wrap: wrap; }
     .spark-link:hover .cap { color: var(--ink); }
 
-    .tile-foot { margin-top: auto; border-top: 2px dashed var(--line); padding-top: 9px; flex: none; }
+    .tile-foot { margin-top: auto; padding-top: 10px; flex: none; }
     .tile-time { color: var(--muted); font-size: 11px; margin-bottom: 7px; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tile-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .btn {
@@ -282,7 +282,7 @@
       <!-- A股恐贪指数 -->
       <section class="card tile" aria-label="A股恐贪指数">
         <div class="tile-top">
-          <div class="tile-title">🎭 A股恐贪指数<span class="sub">8 分项多维模型 · 近 3 年分位</span></div>
+          <div class="tile-title">🎭 A股恐贪指数<span class="sub">9 分项多维模型 · 含估值分位</span></div>
           <span class="badge" id="fgLevel">加载中…</span>
         </div>
 
@@ -465,7 +465,8 @@
       elFgLevel.textContent = main.rating_cn || '--';
       elFgLevel.className = 'badge bg-c' + c;
       elFgMark.style.left = Math.max(1, Math.min(99, s)) + '%';
-      elFgTime.textContent = '数据日期 ' + (d.date || '--') + ' · 7 分项合成';
+      var pnum = main.parts ? Object.keys(main.parts).length : 0;
+      elFgTime.textContent = '数据日期 ' + (d.date || '--') + (pnum ? ' · ' + pnum + ' 分项合成' : '');
 
       var pts = main.points || [];
       if (pts.length > 6) {
