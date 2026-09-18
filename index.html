@@ -97,7 +97,7 @@
       /* min() 保证轨道永不宽于容器，避免被内容 min-content 撑破 */
       grid-template-columns: repeat(auto-fill, minmax(min(248px, 100%), 1fr));
       gap: 14px;
-      align-items: start;
+      align-items: stretch;   /* 同行卡片等高 */
     }
     .tile {
       aspect-ratio: 1 / 1;          /* 首选正方形，装不下时自动撑高 */
@@ -176,6 +176,11 @@
     .bg-c3 { color: #5a4a66; border-color: #efe6f5; background: #fdfaff; }
     .bg-c4 { color: #65a30d; border-color: #d9f99d; background: #f7fee7; }
     .bg-c5 { color: #16a34a; border-color: #bbf7d0; background: #f0fdf4; }
+    .fg-list-title { font-size: 10px; color: var(--muted); margin: 8px 0 4px; }
+    .fg-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; font-size: 11px; }
+    .fg-item { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; }
+    .fg-item b { font-weight: 400; color: var(--muted); white-space: nowrap; }
+    .fg-item i { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
 
     /* ===== 自适应：卡片越窄，排版越紧凑 ===== */
     @container (max-width: 300px) {
@@ -283,19 +288,15 @@
         <div class="fg-scale" aria-hidden="true"><i id="fgMark"></i></div>
         <div class="fg-scale-lbl"><span>极度恐惧</span><span>中性</span><span>极度贪婪</span></div>
 
-        <div class="spark-link" style="cursor:default">
-          <svg id="fgSpark" viewBox="0 0 800 44" preserveAspectRatio="none" aria-label="恐贪指数近 30 日走势"></svg>
-          <span class="cap">
-            <span id="fgSparkLabel">近 30 日走势</span>
-            <span>5 分项分位合成</span>
-          </span>
-        </div>
+        <div class="fg-list-title">各指数恐贪</div>
+        <div class="fg-list" id="fgList"></div>
 
         <div class="tile-foot">
           <div class="tile-time" id="fgTime">数据日期：--</div>
           <div class="tile-actions">
             <span id="fgErr" class="vix-err"></span>
             <button class="btn" id="fgRefresh" type="button">✧ 刷新</button>
+            <a class="btn detail" href="./fng.html">各指数详情 →</a>
           </div>
         </div>
       </section>
@@ -435,7 +436,7 @@
     /* ---------- A股恐贪指数 ---------- */
     var elFgScore = $('fgScore'), elFgDelta = $('fgDelta'), elFgLevel = $('fgLevel'),
         elFgTime = $('fgTime'), elFgMark = $('fgMark'), elFgErr = $('fgErr'),
-        elFgBtn = $('fgRefresh'), elFgSparkLabel = $('fgSparkLabel');
+        elFgBtn = $('fgRefresh'), elFgList = $('fgList');
 
     function fgCls(s) {
       if (s < 20) return 1;
@@ -446,29 +447,38 @@
     }
 
     function renderFg(d) {
-      var s = parseFloat(d.score);
+      var list = d.indices || [];
+      if (!list.length) return;
+      var main = list[0];                       // 主指数（上证指数）
+      var s = parseFloat(main.score);
       if (!isFinite(s)) return;
       var c = fgCls(s);
+
       elFgScore.textContent = s.toFixed(1);
       elFgScore.className = 'vix-price fg-c' + c;
-      elFgLevel.textContent = d.rating_cn || '--';
+      elFgLevel.textContent = main.rating_cn || '--';
       elFgLevel.className = 'badge bg-c' + c;
       elFgMark.style.left = Math.max(1, Math.min(99, s)) + '%';
-      elFgTime.textContent = '数据日期：' + (d.date || '--') + ' · ' + (d.index_name || '上证指数');
+      elFgTime.textContent = '数据日期：' + (d.date || '--');
 
-      var pts = d.points || [];
+      var pts = main.points || [];
       if (pts.length > 6) {
         var diff = s - parseFloat(pts[pts.length - 6][1]);
         var sign = diff > 0 ? '+' : '';
-        elFgDelta.textContent = sign + diff.toFixed(1) + '（较 5 个交易日前）';
+        elFgDelta.textContent = sign + diff.toFixed(1) + '（' + (main.name || '上证指数') + ' 较 5 个交易日前）';
         elFgDelta.className = 'vix-chg fg-c' + c;
       } else {
         elFgDelta.textContent = '';
       }
-      if (pts.length) drawMini(elFgSpark(), elFgSparkLabel, pts.slice(-30), 'fg');
-    }
 
-    function elFgSpark() { return $('fgSpark'); }
+      if (elFgList) {
+        elFgList.innerHTML = list.slice(1).map(function (it) {
+          var cc = fgCls(parseFloat(it.score));
+          return '<span class="fg-item"><b>' + it.name + '</b><i class="fg-c' + cc + '">'
+            + parseFloat(it.score).toFixed(1) + '</i></span>';
+        }).join('');
+      }
+    }
 
     function loadFg() {
       elFgBtn.disabled = true; elFgBtn.textContent = '刷新中…';
