@@ -1,13 +1,13 @@
 {
-  "price": 15.25,
-  "change": -0.19,
-  "change_percent": -1.2306,
+  "price": 15.44,
+  "change": -2.27,
+  "change_percent": -14.7021,
   "open": 15.4,
   "high": 16.02,
   "low": 15.38,
   "prev_close": 15.44,
-  "iv30": 74.883,
+  "iv30": 74.735,
   "last_trade_time": "2026-09-17T16:15:01",
-  "fetched_at": "2026-09-18 08:59:13",
+  "fetched_at": "2026-09-18 05:50:06",
   "source": "CBOE"
 }
