@@ -83,6 +83,75 @@
       border-top: 1px solid var(--line);
       background: var(--panel);
     }
+    /* ===== VIX 区块 ===== */
+    .vix-wrap { margin-top: 28px; }
+    .vix-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .vix-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .vix-title { font-weight: 700; font-size: 16px; }
+    .vix-badge {
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: var(--bg);
+    }
+    .b-red   { color: #dc2626; border-color: #fecaca; background: #fef2f2; }
+    .b-orange{ color: #d97706; border-color: #fde68a; background: #fffbeb; }
+    .b-green { color: #16a34a; border-color: #bbf7d0; background: #f0fdf4; }
+    .vix-main { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+    .vix-price {
+      font-size: 46px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+    .vix-chg { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .up   { color: #dc2626; }  /* 涨：红（A股惯例） */
+    .down { color: #16a34a; }  /* 跌：绿 */
+    .flat { color: var(--muted); }
+    .vix-meta {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .vix-btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .vix-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .vix-btn:disabled { opacity: .5; cursor: wait; }
+    .vix-err { color: #d97706; }
+    .vix-note {
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.8;
+      border-top: 1px dashed var(--line);
+      padding-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -101,7 +170,32 @@
       <p>骨架已就位，内容待填入。<br />这是一个干净的起点：头部、导航、主区、卡片、页脚一应俱全。</p>
     </section>
 
-    <section class="grid">
+    <section class="vix-wrap" aria-label="VIX 恐慌指数">
+      <div class="vix-card">
+        <div class="vix-head">
+          <div class="vix-title">VIX 恐慌指数 · 标普500波动率（.VIX）</div>
+          <span class="vix-badge" id="vixLevel">加载中…</span>
+        </div>
+        <div class="vix-main">
+          <span class="vix-price flat" id="vixPrice">--.--</span>
+          <span class="vix-chg flat" id="vixChg">等待数据…</span>
+        </div>
+        <div class="vix-meta">
+          <span id="vixTime">数据时间：--</span>
+          <span>
+            <span id="vixErr" class="vix-err"></span>
+            <span id="vixCountdown">--</span> 秒后自动刷新
+            <button class="vix-btn" id="vixRefresh" type="button">立即刷新</button>
+          </span>
+        </div>
+        <div class="vix-note">
+          数据源：腾讯财经 qt.gtimg.cn（免密钥、浏览器直连），页面打开期间每 30 秒自动拉取一次最新行情。
+          VIX 高于 30 通常代表市场恐慌情绪升温，低于 15 代表情绪平静；涨跌配色遵循 A 股惯例（涨红跌绿）。
+        </div>
+      </div>
+    </section>
+
+    <section class="grid" style="margin-top: 28px;">
       <div class="card">
         <div class="icon">📄</div>
         <h3>页面结构</h3>
@@ -123,5 +217,106 @@
   <footer>
     © 2026 Shell Site · 空壳网站 · 由 GitHub Pages 托管
   </footer>
+
+  <script>
+  (function () {
+    'use strict';
+    var REFRESH_SECONDS = 30;
+    var left = 0, busy = false, hasData = false;
+    var timer = null;
+
+    var elPrice = document.getElementById('vixPrice');
+    var elChg = document.getElementById('vixChg');
+    var elTime = document.getElementById('vixTime');
+    var elLevel = document.getElementById('vixLevel');
+    var elCount = document.getElementById('vixCountdown');
+    var elErr = document.getElementById('vixErr');
+    var elBtn = document.getElementById('vixRefresh');
+
+    function setCls(el, c) {
+      el.classList.remove('up', 'down', 'flat');
+      el.classList.add(c);
+    }
+
+    function levelInfo(v) {
+      if (v >= 30) return ['极度恐慌 ≥30', 'b-red'];
+      if (v >= 20) return ['恐慌升温 20~30', 'b-orange'];
+      if (v >= 15) return ['情绪中性 15~20', ''];
+      return ['市场平静 <15', 'b-green'];
+    }
+
+    function render(price, chg, pct, time) {
+      var dirCls = chg > 0 ? 'up' : (chg < 0 ? 'down' : 'flat');
+      setCls(elPrice, dirCls);
+      elPrice.textContent = price.toFixed(2);
+
+      if (chg === 0 && pct === 0) {
+        elChg.textContent = '0.00 (0.00%)';
+        setCls(elChg, 'flat');
+      } else {
+        var sign = chg > 0 ? '+' : '';
+        elChg.textContent = sign + chg.toFixed(2) + ' (' + sign + pct.toFixed(2) + '%)';
+        setCls(elChg, dirCls);
+      }
+
+      elTime.textContent = '数据时间：' + (time || '--') + '（美东）';
+
+      var info = levelInfo(price);
+      elLevel.textContent = info[0];
+      elLevel.className = 'vix-badge ' + info[1];
+      hasData = true;
+    }
+
+    function load() {
+      if (busy) return;
+      busy = true;
+      elBtn.disabled = true;
+      elBtn.textContent = '刷新中…';
+      // 加时间戳防缓存，确保每次拿到最新行情
+      fetch('https://qt.gtimg.cn/q=usVIX&r=' + Date.now(), { cache: 'no-store' })
+        .then(function (res) { return res.arrayBuffer(); })
+        .then(function (buf) { return new TextDecoder('gbk').decode(buf); })
+        .then(function (text) {
+          var m = text.match(/v_usVIX="([^"]*)"/);
+          if (!m || !m[1]) throw new Error('empty payload');
+          var f = m[1].split('~');
+          var price = parseFloat(f[3]);
+          var prev = parseFloat(f[4]);
+          var chg = parseFloat(f[5]);
+          var pct = parseFloat(f[6]);
+          if (!isFinite(price) || !isFinite(prev)) throw new Error('bad fields');
+          if (!isFinite(chg)) chg = price - prev;
+          if (!isFinite(pct)) pct = prev ? (chg / prev) * 100 : 0;
+          render(price, chg, pct, f[30]);
+          elErr.textContent = '';
+        })
+        .catch(function () {
+          elErr.textContent = hasData ? '⚠ 数据源暂时不可用，显示上次成功数据' : '⚠ 数据加载失败，稍后自动重试';
+        })
+        .finally(function () {
+          busy = false;
+          elBtn.disabled = false;
+          elBtn.textContent = '立即刷新';
+          left = REFRESH_SECONDS;
+          updateCountdown();
+        });
+    }
+
+    function updateCountdown() {
+      elCount.textContent = String(left > 0 ? left : 0);
+    }
+
+    timer = setInterval(function () {
+      if (busy) return;
+      left -= 1;
+      if (left <= 0) { load(); } else { updateCountdown(); }
+    }, 1000);
+
+    elBtn.addEventListener('click', load);
+    left = REFRESH_SECONDS;
+    updateCountdown();
+    load();
+  })();
+  </script>
 </body>
 </html>
