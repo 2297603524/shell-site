@@ -27,11 +27,20 @@
       min-height: 100vh;
       display: flex;
       flex-direction: column;
-      background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 48%, var(--bg-bottom) 100%);
+      background: linear-gradient(180deg, rgba(255,233,245,.78) 0%, rgba(242,233,255,.72) 48%, rgba(226,242,255,.82) 100%);
       background-attachment: fixed;
       overflow-x: hidden;
       -webkit-tap-highlight-color: transparent;
       -webkit-font-smoothing: antialiased;
+    }
+    /* 二次元场景背景：固定层，不随滚动 */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background: url('./img/bg.webp') center top / cover no-repeat;
+      pointer-events: none;
     }
 
     /* ===== 樱花 ===== */
