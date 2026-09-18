@@ -218,8 +218,8 @@
         <svg id="chartSvg" viewBox="0 0 820 300" aria-label="恐贪指数走势"></svg>
       </div>
       <div class="chart-foot">
-        <span>左轴：恐贪指数 0~100（20/40/60/80 为情绪分档）　灰色虚线：指数点位（右轴）</span>
-        <span>悬停或滑动图表查看数值</span>
+        <span>左轴：恐贪 0~100（20/40/60/80 分档）　灰虚线：指数点位（右轴，长周期为对数刻度）　近 250 日为日线、更早按月采样</span>
+        <span>悬停或滑动查看数值</span>
       </div>
     </section>
 
@@ -403,26 +403,27 @@
         s += '<text x="' + (x0 - 6) + '" y="' + (y + 4) + '" text-anchor="end" font-size="' + fs + '" fill="#b8a6c4">' + v + '</text>';
       });
 
-      // 指数点位对照线（右轴，灰色虚线）
+      // 指数点位对照线（右轴；跨几十年用对数刻度，避免早期被压扁/出现负刻度）
       var priceVals = [];
-      p.forEach(function (x) { if (isFinite(x[2])) priceVals.push(x[2]); });
+      p.forEach(function (x) { if (isFinite(x[2]) && x[2] > 0) priceVals.push(x[2]); });
       if (priceVals.length > 1) {
         var pmn = Math.min.apply(null, priceVals), pmx = Math.max.apply(null, priceVals);
-        var ppad = (pmx - pmn) * 0.06 || 1;
-        pmn -= ppad; pmx += ppad;
-        var pny = function (v) { return y1 - (v - pmn) / (pmx - pmn) * (y1 - y0); };
+        var useLog = (pmx / pmn) > 4;
+        var f = useLog ? Math.log : function (v) { return v; };
+        var lo = f(pmn), hi = f(pmx);
+        var pad = (hi - lo) * 0.05;
+        lo -= pad; hi += pad;
+        var pny = function (v) { return y1 - (f(v) - lo) / (hi - lo) * (y1 - y0); };
         var pline = '';
         p.forEach(function (x, i) {
-          if (!isFinite(x[2])) return;
+          if (!isFinite(x[2]) || x[2] <= 0) return;
           pline += (pline ? 'L' : 'M') + nx(i).toFixed(1) + ' ' + pny(x[2]).toFixed(1);
         });
         s += '<path d="' + pline + '" fill="none" stroke="#8ea6c4" stroke-width="1.5"'
           + ' stroke-dasharray="5 4" opacity="0.95"/>';
         [0, 0.5, 1].forEach(function (t) {
-          var v = pmn + (pmx - pmn) * t;
-          var txt = Math.abs(v) >= 1000
-            ? Math.round(v).toLocaleString('en-US')
-            : Math.round(v).toString();
+          var v = useLog ? Math.exp(lo + (hi - lo) * t) : (lo + (hi - lo) * t);
+          var txt = v >= 1000 ? Math.round(v).toLocaleString('en-US') : Math.round(v).toString();
           s += '<text x="' + (x1 + 6) + '" y="' + (pny(v) + 4) + '" font-size="' + fs
             + '" fill="#8ea6c4">' + txt + '</text>';
         });
@@ -443,10 +444,12 @@
       [0, Math.floor((p.length - 1) / 2), p.length - 1].forEach(function (i) {
         if (i >= 0 && xIdx.indexOf(i) === -1) xIdx.push(i);
       });
+      var crossYear = p[0][0].slice(0, 4) !== p[p.length - 1][0].slice(0, 4);
       xIdx.forEach(function (i, k) {
         var anchor = (k === 0) ? 'start' : (k === xIdx.length - 1 ? 'end' : 'middle');
+        var label = crossYear ? p[i][0].slice(0, 7) : p[i][0].slice(5);
         s += '<text x="' + nx(i).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="' + anchor
-          + '" font-size="' + fs + '" fill="#b8a6c4">' + p[i][0].slice(5) + '</text>';
+          + '" font-size="' + fs + '" fill="#b8a6c4">' + label + '</text>';
       });
 
       s += '<line id="hoverLine" x1="0" y1="' + y0 + '" x2="0" y2="' + y1 + '" stroke="#c084fc" stroke-width="1.2" stroke-dasharray="4 4" opacity="0"/>';
@@ -456,7 +459,9 @@
       svg._map = { pts: p, nx: nx, ny: ny, x0: x0, x1: x1, W: W, H: H };
 
       var it = DATA.indices[CUR];
-      $('chartSub').textContent = '（' + it.name + '，' + p[0][0] + ' ~ ' + p[p.length - 1][0] + '，共 ' + p.length + ' 个交易日）';
+      var full = it.fullDays ? '，全史 ' + it.fullDays + ' 个交易日' : '';
+      $('chartSub').textContent = '（' + it.name + '，' + p[0][0] + ' ~ ' + p[p.length - 1][0]
+        + '，共 ' + p.length + ' 个点' + full + '）';
 
       if (lastHoverIdx !== null) applyHover(Math.min(lastHoverIdx, p.length - 1));
     }
@@ -481,7 +486,8 @@
           ? Number(p[idx][2]).toLocaleString('en-US', { maximumFractionDigits: 2 })
           : p[idx][2])
         : '';
-      tip.textContent = p[idx][0] + '　恐贪 ' + f1(p[idx][1]) + priceTxt;
+      var nTxt = (p[idx][3] && p[idx][3] < 9) ? '　分项 ' + p[idx][3] + '/9' : '';
+      tip.textContent = p[idx][0] + '　恐贪 ' + f1(p[idx][1]) + priceTxt + nTxt;
       tip.classList.add('on');
       lastHoverIdx = idx;
     }

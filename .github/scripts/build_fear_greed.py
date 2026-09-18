@@ -1,27 +1,29 @@
 #!/usr/bin/env python3
-"""构建 A 股各主要指数的恐贪指数（9 分项多维模型）→ data/fear-greed.json
+"""构建 A 股各主要指数的恐贪指数（9 分项多维模型，覆盖指数成立以来全历史）→ data/fear-greed.json
 
 数据源（全部免密钥）:
-    指数日K:  东财 push2his.eastmoney.com  →  腾讯 web.ifzq.gtimg.cn（兜底）
-    融资数据: 东财 datacenter RPTA_RZRQ_LSHJ（全市场融资买入额，每日）
-    指数估值: 乐咕乐股 legulegu.com（月度 PE-TTM 历史；token = 当天日期 MD5，csrf 从页面取）
+    指数日K:  东财 push2his.eastmoney.com  →  腾讯 web.ifzq.gtimg.cn（兜底），尽量取全历史
+    融资数据: 东财 datacenter RPTA_RZRQ_LSHJ（全市场融资买入额，2010-03 融资融券业务启动以来）
+    指数估值: 乐咕乐股 legulegu.com（月度 PE-TTM 历史，部分自 2005 年起）
 
-模型（9 个分项；价格/估值类随指数独立计算，市场类全市场共享）:
-    1. 价格动量   收盘 vs MA125 偏离度              → 越高越贪婪
-    2. 短期趋势   近 20 日涨跌幅                    → 越高越贪婪
-    3. 均线广度   近 20 日"收盘>MA20"的天数占比      → 越高越贪婪
-    4. 波动率     20 日年化波动率（反向分位）        → 波动越大越恐惧
-    5. 量能热度   成交量 vs MA60 偏离度              → 越高越贪婪
-    6. 融资热度   全市场融资买入额 vs MA20 偏离度     → 加杠杆越猛越贪婪
-    7. 风险偏好   中证1000 与沪深300 近 60 日相对强弱  → 小盘越强越贪婪
-    8. 回撤深度   收盘距近 250 交易日高点             → 越接近新高越贪婪
-    9. 估值分位   指数 PE(TTM) 在近 60 个月中的分位   → 估值越贵越贪婪  ★
+模型（9 个分项）:
+    ① 价格动量  收盘 vs MA125 偏离      ② 短期趋势  近 20 日涨跌
+    ③ 均线广度  20 日内收盘>MA20 占比   ④ 波动率    20 日年化（反向）
+    ⑤ 量能热度  成交量 vs MA60          ⑥ 融资热度  全市场融资买入额 vs MA20
+    ⑦ 风险偏好  中证1000 vs 沪深300    ⑧ 回撤深度  距 250 日高点
+    ⑨ 估值分位  指数 PE-TTM 近 60 个月分位
+    ⚠️ 早期（如融资数据 2010 年前、估值数据缺失期）自动降级：该日只用可用分项等权平均。
+       每个交易日的实际分项数记录在 "n" 字段中（3=价格类基础，完整期为 9）
 
-价格类分项取近 3 年（750 交易日）滚动分位；估值分项直接取月度 PE 分位。
+输出采样（控制体积同时保留完整时间跨度）:
+    近 RECENT_DAYS(250) 个交易日 → 全部日线点
+    更早 → 每月最后一个交易日
+    points: [[日期, 恐贪值, 收盘点位, 当日分项数], ...]
 
 用法:
     python build_fear_greed.py [输出json路径]   默认 data/fear-greed.json
 """
+import bisect
 import hashlib
 import http.cookiejar
 import json
@@ -31,12 +33,14 @@ import re
 import sys
 import time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 EM_KLINE = ("https://push2his.eastmoney.com/api/qt/stock/kline/get"
             "?secid=%s&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55,f56,f57"
             "&klt=101&fqt=1&lmt=%d&end=20500101")
 TX_KLINE = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=%s,day,,,%d,qfq"
+TX_KLINE_RANGE = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=%s,day,%s,%s,800,qfq"
 DC_MARGIN = ("https://datacenter-web.eastmoney.com/api/data/v1/get"
              "?reportName=RPTA_RZRQ_LSHJ&columns=ALL&pageNumber=%d&pageSize=500"
              "&sortColumns=DIM_DATE&sortTypes=-1&source=WEB&client=WEB")
@@ -45,37 +49,41 @@ LG_API = "https://legulegu.com/api/stockdata/index-basic-pe"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36")
 
-# (东财 secid, 腾讯 code, 显示名)
+# (东财 secid, 腾讯 code, 显示名, 起始年份)
 INDICES = [
-    ("1.000001", "sh000001", "上证指数"),
-    ("0.399001", "sz399001", "深证成指"),
-    ("0.399006", "sz399006", "创业板指"),
-    ("1.000300", "sh000300", "沪深300"),
-    ("1.000905", "sh000905", "中证500"),
-    ("1.000016", "sh000016", "上证50"),
-    ("1.000688", "sh000688", "科创50"),
+    ("1.000001", "sh000001", "上证指数", 1990),
+    ("0.399001", "sz399001", "深证成指", 1991),
+    ("0.399006", "sz399006", "创业板指", 2010),
+    ("1.000300", "sh000300", "沪深300", 2005),
+    ("1.000905", "sh000905", "中证500", 2007),
+    ("1.000016", "sh000016", "上证50", 2004),
+    ("1.000688", "sh000688", "科创50", 2020),
 ]
-SMALL_CAP = ("1.000852", "sh000852")     # 中证1000
-LARGE_CAP = ("1.000300", "sh000300")     # 沪深300
+SMALL_CAP = ("1.000852", "sh000852", "中证1000", 2014)
+LARGE_CAP = ("1.000300", "sh000300", "沪深300", 2005)
 
-# 估值数据（乐咕支持的指数，取同风格代表）
 VAL_MAP = {
-    "上证指数": "000010.SH",   # 上证180（沪市大盘）
-    "深证成指": "399330.SZ",   # 深证100（深市大盘）
-    "创业板指": "399673.SZ",   # 创业板50
+    "上证指数": "000010.SH",
+    "深证成指": "399330.SZ",
+    "创业板指": "399673.SZ",
     "沪深300": "000300.SH",
     "中证500": "000905.SH",
     "上证50": "000016.SH",
-    "科创50": "399673.SZ",     # 创业板50（成长风格代理）
+    "科创50": "399673.SZ",
 }
 
-KLIMIT = 1500
+KLIMIT = 9000        # 日K 抓取上限（覆盖上证指数 1990 年至今）
+MARGIN_PAGES = 9     # 融资数据页数（9×500=4500 条，覆盖 2010 年至今）
 WINDOW = 750         # 价格类分位窗口 = 近 3 年
-VAL_WINDOW = 60      # 估值分位窗口 = 近 60 个月（5 年）
-KEEP_DAYS = 150
+VAL_WINDOW = 60      # 估值分位窗口 = 近 60 个月
+RECENT_DAYS = 250    # 近期保留日线点的天数，更早按月采样
+
+PRICE_KEYS = ["momentum", "trend", "breadth", "volatility", "volume", "drawdown"]
+EXTRA_KEYS = ["margin", "riskon"]
+PART_ORDER = PRICE_KEYS + EXTRA_KEYS + ["valuation"]
 
 
-def _get(url: str, timeout: int = 45, headers: dict = None) -> dict:
+def _get(url: str, timeout: int = 60, headers: dict = None) -> dict:
     h = {"User-Agent": UA, "Referer": "https://quote.eastmoney.com/", "Accept": "*/*", "Connection": "close"}
     if headers:
         h.update(headers)
@@ -102,40 +110,57 @@ def fetch_em(secid: str, limit: int = KLIMIT):
     return data.get("name") or secid, dates, closes, vols
 
 
-def fetch_tx(code: str, limit: int = KLIMIT):
-    d = ((_get(TX_KLINE % (code, limit), timeout=30).get("data")) or {}).get(code) or {}
+def _tx_rows(code: str, start: str, end: str):
+    d = ((_get(TX_KLINE_RANGE % (code, start, end), timeout=30).get("data")) or {}).get(code) or {}
     rows = d.get("qfqday") or d.get("day") or []
-    dates, closes, vols = [], [], []
+    out = []
     for row in rows:
         if len(row) < 6:
             continue
         try:
-            dates.append(row[0])
-            closes.append(float(row[2]))
-            vols.append(float(row[5]))
+            out.append((row[0], float(row[2]), float(row[5])))
         except ValueError:
             continue
-    if not dates:
+    return out
+
+
+def fetch_tx(code: str, first_year: int = 1990, seg: int = 3, workers: int = 3):
+    """腾讯单次上限 800 条 → 按 3 年分段并发抓取完整历史"""
+    spans = []
+    y = first_year
+    this_year = date.today().year
+    while y <= this_year:
+        e = min(y + seg - 1, this_year)
+        spans.append(("%d-01-01" % y, "%d-12-31" % e))
+        y = e + 1
+    merged = []
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        for rows in ex.map(lambda sp: _tx_rows(code, sp[0], sp[1]), spans):
+            merged.extend(rows)
+    dedup = {}
+    for d, c, v in merged:
+        dedup[d] = (c, v)
+    if not dedup:
         raise ValueError("empty day rows")
-    return dates, closes, vols
+    keys = sorted(dedup)
+    return keys, [dedup[k][0] for k in keys], [dedup[k][1] for k in keys]
 
 
-def get_kline(label: str, em_id: str, tx_code: str):
-    for attempt in (1, 2):
-        try:
-            return fetch_em(em_id)
-        except Exception:  # noqa: BLE001
-            if attempt == 1:
-                time.sleep(1.5)
-    dates, closes, vols = fetch_tx(tx_code)
-    print("   fallback → 腾讯源: %s" % label)
+def get_kline(label: str, em_id: str, tx_code: str, first_year: int = 1990):
+    try:
+        name, dates, closes, vols = fetch_em(em_id)
+        if len(dates) > 1000:          # 东财可用且拿到长历史，直接用
+            return name, dates, closes, vols
+    except Exception:  # noqa: BLE001
+        pass
+    dates, closes, vols = fetch_tx(tx_code, first_year)
+    print("   fallback → 腾讯分段: %s（%s 起 %d 条）" % (label, dates[0], len(dates)))
     return label, dates, closes, vols
 
 
 def fetch_margin():
-    """全市场融资买入额（流量）→ {date: 值}"""
     out = {}
-    for page in (1, 2, 3):
+    for page in range(1, MARGIN_PAGES + 1):
         try:
             res = _get(DC_MARGIN % page).get("result") or {}
             rows = res.get("data") or []
@@ -149,19 +174,18 @@ def fetch_margin():
             v = r.get("RZMRE") or r.get("RZYE")
             if d and v:
                 out[d] = float(v)
-        time.sleep(0.6)
-    print("   融资数据历史: %d 条" % len(out))
+        time.sleep(0.5)
+    print("   融资数据历史: %d 条（%s 起）" % (len(out), min(out).__str__() if out else "-"))
     return out
 
 
 def fetch_valuation():
-    """乐咕指数 PE-TTM（月度）→ {indexCode: {YYYY-MM: 分位(0~100)}}；失败返回 {}"""
     try:
         token = hashlib.md5(date.today().isoformat().encode("utf-8")).hexdigest()
         cj = http.cookiejar.CookieJar()
         opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
         opener.addheaders = [("User-Agent", UA)]
-        html = opener.open(LG_PAGE, timeout=40).read().decode("utf-8", "ignore")
+        html = opener.open(LG_PAGE, timeout=45).read().decode("utf-8", "ignore")
         m = re.search(r'_csrf"\s+content="([^"]+)"', html)
         csrf = m.group(1) if m else ""
 
@@ -171,11 +195,11 @@ def fetch_valuation():
                 req = urllib.request.Request(
                     "%s?token=%s&indexCode=%s" % (LG_API, token, code),
                     headers={"User-Agent": UA, "X-CSRF-TOKEN": csrf, "Referer": LG_PAGE})
-                rows = (json.loads(opener.open(req, timeout=40).read()) or {}).get("data") or []
+                rows = (json.loads(opener.open(req, timeout=45).read()) or {}).get("data") or []
                 series = [(str(r.get("date"))[:7], float(r["ttmPe"]))
                           for r in rows if r.get("date") and r.get("ttmPe")]
                 if not series:
-                    print("   valuation empty: %s" % code)
+                    print("   估值 %s 无数据" % code)
                     continue
                 q = {}
                 for i, (mo, v) in enumerate(series):
@@ -183,22 +207,25 @@ def fetch_valuation():
                     win = [x[1] for x in series[lo:i + 1]]
                     q[mo] = round(100.0 * sum(1 for x in win if x <= v) / len(win), 1)
                 out[code] = q
-                print("   估值 %-11s %d 个月（最新 %s = %s 分位）" % (code, len(series), series[-1][0], q[series[-1][0]]))
+                print("   估值 %-11s %d 个月（%s 起）" % (code, len(series), series[0][0]))
             except Exception as e:  # noqa: BLE001
-                print("   valuation %s failed: %s" % (code, e))
-            time.sleep(0.8)
+                print("   估值 %s 失败: %s" % (code, e))
+            time.sleep(0.7)
         return out
     except Exception as e:  # noqa: BLE001
-        print("   估值数据源不可用（该分项将跳过）: %s" % e)
+        print("   估值数据源不可用（该分项跳过）: %s" % e)
         return {}
 
 
 def pct_rank_series(series, window=WINDOW):
-    out = []
+    """滑动窗口分位（bisect 维护有序窗口，比逐窗口求和快一个量级）"""
+    out, win = [], []
+    n = len(series)
     for i, v in enumerate(series):
-        lo = max(0, i - window + 1)
-        win = series[lo:i + 1]
-        out.append(100.0 * sum(1 for x in win if x <= v) / len(win))
+        bisect.insort(win, v)
+        if len(win) > window:
+            del win[bisect.bisect_left(win, series[i - window])]
+        out.append(100.0 * bisect.bisect_right(win, v) / len(win))
     return out
 
 
@@ -224,90 +251,120 @@ def align_map(dates, value_map):
     return out
 
 
-def compute(dates, closes, vols, margin_by_date, small, large, val_by_month):
+def build_rows(dates, closes, vols, margin_by_date, small, large, val_by_month):
+    """逐日计算各分项原始值；缺失的分项不参与该日合成（早期数据自动降级）"""
     n = len(closes)
-    if n < 300:
+    if n < 200:
         return None
 
     m_ser = align_map(dates, margin_by_date)
     s_ser = align_map(dates, small)
     l_ser = align_map(dates, large)
 
-    mom, trend, breadth, vol_amt, vola, margin_dev, risk_pref, drawdown, valuation, idx = \
-        [], [], [], [], [], [], [], [], [], []
-    has_val = bool(val_by_month)
-
+    rows = []
     for i in range(125, n):
         ma125 = sum(closes[i - 124:i + 1]) / 125.0
-        ma60v = sum(vols[i - 59:i + 1]) / 60.0
-        if ma125 <= 0 or ma60v <= 0:
+        if ma125 <= 0:
             continue
-
-        # 估值分项（月度 PE 分位，已是 0~100）
-        if has_val:
-            vq = val_by_month.get(dates[i][:7])
-            if vq is None:
-                continue
-            valuation.append(vq)
-
-        mom.append(closes[i] / ma125 - 1.0)
-        trend.append(closes[i] / closes[i - 20] - 1.0)
-
-        cnt = 0
+        row = {
+            "date": dates[i],
+            "close": closes[i],
+            "momentum": closes[i] / ma125 - 1.0,
+            "trend": closes[i] / closes[i - 20] - 1.0,
+        }
+        ma20hits = 0
         for k in range(i - 19, i + 1):
             if closes[k] > sum(closes[k - 19:k + 1]) / 20.0:
-                cnt += 1
-        breadth.append(cnt / 20.0)
-
-        vol_amt.append(vols[i] / ma60v - 1.0)
+                ma20hits += 1
+        row["breadth"] = ma20hits / 20.0
 
         rets = []
         for k in range(i - 19, i + 1):
-            prev = closes[k - 1]
-            if prev:
-                rets.append(math.log(closes[k] / prev))
+            if closes[k - 1]:
+                rets.append(math.log(closes[k] / closes[k - 1]))
         mean = sum(rets) / len(rets)
         var = sum((r - mean) ** 2 for r in rets) / (len(rets) - 1)
-        vola.append(math.sqrt(var) * math.sqrt(252.0))
+        row["volatility"] = math.sqrt(var) * math.sqrt(252.0)
 
-        if m_ser[i] is None or m_ser[i - 19] is None or m_ser[i] <= 0:
-            continue
-        margin_dev.append(m_ser[i] / (sum(m_ser[i - 19:i + 1]) / 20.0) - 1.0)
-
-        if s_ser[i] is None or s_ser[i - 60] is None or l_ser[i] is None or l_ser[i - 60] is None:
-            continue
-        risk_pref.append((s_ser[i] / s_ser[i - 60] - 1.0) - (l_ser[i] / l_ser[i - 60] - 1.0))
+        ma60v = sum(vols[i - 59:i + 1]) / 60.0
+        if ma60v > 0:
+            row["volume"] = vols[i] / ma60v - 1.0
 
         hi250 = max(closes[max(0, i - 249):i + 1])
-        drawdown.append(closes[i] / hi250 - 1.0)
+        row["drawdown"] = closes[i] / hi250 - 1.0
 
-        idx.append(i)
+        if m_ser[i] is not None and m_ser[i - 19] is not None and m_ser[i] > 0:
+            base = sum(m_ser[i - 19:i + 1])
+            if base > 0:
+                row["margin"] = m_ser[i] / (base / 20.0) - 1.0
 
-    if len(idx) < 60:
+        if (s_ser[i] and s_ser[i - 60] and l_ser[i] and l_ser[i - 60]):
+            row["riskon"] = (s_ser[i] / s_ser[i - 60] - 1.0) - (l_ser[i] / l_ser[i - 60] - 1.0)
+
+        if val_by_month:
+            vq = val_by_month.get(dates[i][:7])
+            if vq is not None:
+                row["valuation"] = vq          # 已是分位，不再二次排名
+
+        rows.append(row)
+    return rows
+
+
+def score_rows(rows):
+    """对每个分项分别做滚动分位，再按行等权平均（只用该日可用的分项）"""
+    keys = [k for k in PART_ORDER if k in rows[-1] or any(k in r for r in rows)]
+    for k in keys:
+        if k == "valuation":
+            continue                      # 估值已是分位
+        ser = [r[k] for r in rows if k in r]
+        if len(ser) < 30:
+            continue
+        ranks = pct_rank_series(ser)
+        if k == "volatility":
+            ranks = [100.0 - x for x in ranks]      # 波动率反向
+        it = iter(ranks)
+        for r in rows:
+            if k in r:
+                r["_r_" + k] = next(it)
+    for r in rows:
+        if "valuation" in r:
+            r["_r_valuation"] = r["valuation"]
+        vals = [v for k, v in r.items() if k.startswith("_r_")]
+        if vals:
+            r["score"] = round(sum(vals) / len(vals), 1)
+            r["n"] = len(vals)
+    return [r for r in rows if "score" in r]
+
+
+def sample_rows(rows, recent=RECENT_DAYS):
+    """近 recent 个交易日保留日线，更早按每月最后一个交易日采样"""
+    n = len(rows)
+    if n <= recent:
+        return list(range(n))
+    idx = []
+    older = {}
+    for j in range(0, n - recent):
+        older[rows[j]["date"][:7]] = j        # 同月覆盖 → 保留当月最后一个
+    idx.extend(sorted(older.values()))
+    idx.extend(range(n - recent, n))
+    return idx
+
+
+def compute(dates, closes, vols, margin_by_date, small, large, val_by_month):
+    rows = build_rows(dates, closes, vols, margin_by_date, small, large, val_by_month)
+    if not rows:
+        return None
+    rows = score_rows(rows)
+    if len(rows) < 30:
         return None
 
-    ranks = [
-        pct_rank_series(mom),
-        pct_rank_series(trend),
-        pct_rank_series(breadth),
-        [100.0 - x for x in pct_rank_series(vola)],
-        pct_rank_series(vol_amt),
-        pct_rank_series(margin_dev),
-        pct_rank_series(risk_pref),
-        pct_rank_series(drawdown),
-    ]
-    part_names = ["momentum", "trend", "breadth", "volatility", "volume", "margin", "riskon", "drawdown"]
-    if has_val and len(valuation) == len(idx):
-        ranks.append(valuation)          # 已是分位，直接用
-        part_names.append("valuation")
+    sel = sample_rows(rows)
+    points = [[rows[j]["date"], rows[j]["score"], round(rows[j]["close"], 2), rows[j]["n"]] for j in sel]
 
-    scores = [round(sum(r[j] for r in ranks) / len(ranks), 1) for j in range(len(idx))]
-    last = len(idx) - 1
-    rating, rating_cn = rating_of(scores[last])
-    parts = {k: round(ranks[i][last], 1) for i, k in enumerate(part_names)}
-    points = [[dates[idx[j]], scores[j], round(closes[idx[j]], 2)]
-              for j in range(max(0, len(idx) - KEEP_DAYS), len(idx))]
-    return scores[last], rating, rating_cn, parts, points, dates[idx[last]]
+    last = rows[-1]
+    rating, rating_cn = rating_of(last["score"])
+    parts = {k: round(last["_r_" + k], 1) for k in PART_ORDER if ("_r_" + k) in last}
+    return last["score"], rating, rating_cn, parts, points, last["date"], len(rows)
 
 
 def main() -> None:
@@ -318,33 +375,34 @@ def main() -> None:
     val_raw = fetch_valuation()
 
     print("   抓取中证1000 / 沪深300（风险偏好分项）…")
-    _, s_dates, s_closes, _ = get_kline("中证1000", SMALL_CAP[0], SMALL_CAP[1])
-    _, l_dates, l_closes, _ = get_kline("沪深300", LARGE_CAP[0], LARGE_CAP[1])
+    _, s_dates, s_closes, _ = get_kline(SMALL_CAP[2], SMALL_CAP[0], SMALL_CAP[1], SMALL_CAP[3])
+    _, l_dates, l_closes, _ = get_kline(LARGE_CAP[2], LARGE_CAP[0], LARGE_CAP[1], LARGE_CAP[3])
     small_map = dict(zip(s_dates, s_closes))
     large_map = dict(zip(l_dates, l_closes))
 
     out_indices, as_of = [], ""
-    for em_id, tx_code, label in INDICES:
+    for em_id, tx_code, label, first_year in INDICES:
         try:
-            name, dates, closes, vols = get_kline(label, em_id, tx_code)
+            name, dates, closes, vols = get_kline(label, em_id, tx_code, first_year)
         except Exception as e:  # noqa: BLE001
             print("skip %s: %s" % (label, e))
             continue
 
         vcode = VAL_MAP.get(name) or VAL_MAP.get(label)
-        val_by_month = val_raw.get(vcode) if vcode else None
-        res = compute(dates, closes, vols, margin_map, small_map, large_map, val_by_month)
+        res = compute(dates, closes, vols, margin_map, small_map, large_map,
+                      val_raw.get(vcode) if vcode else None)
         if not res:
             print("skip %s: not enough data" % name)
             continue
-        score, rating, rating_cn, parts, points, last_date = res
+        score, rating, rating_cn, parts, points, last_date, total = res
         as_of = max(as_of, last_date)
         out_indices.append({
             "name": name, "score": score, "rating": rating, "rating_cn": rating_cn,
-            "parts": parts, "points": points,
-            "valIndex": vcode or "",
+            "parts": parts, "points": points, "valIndex": vcode or "",
+            "fullDays": total, "start": dates[0],
         })
-        print("ok  %-8s %6s  %s  分项=%s" % (name, score, rating_cn, parts))
+        print("ok  %-8s %6s  %s | 全史 %d 日至 %s，输出 %d 点（%s ~ %s）" % (
+            name, score, rating_cn, total, last_date, len(points), points[0][0], points[-1][0]))
         time.sleep(1.0)
 
     if not out_indices:
@@ -358,6 +416,7 @@ def main() -> None:
         "model": ("价格动量 / 短期趋势 / 均线广度 / 波动率(反向) / 量能热度 / 融资热度 / "
                   "风险偏好 / 回撤深度 / 估值分位(PE-TTM 近 60 个月)"),
         "window": "价格类取近 3 年（750 交易日）滚动分位；估值取近 60 个月 PE 分位",
+        "sampling": "近 250 个交易日为日线，更早按每月最后一个交易日采样（时间跨度覆盖指数成立以来）",
         "indices": out_indices,
     }
 
