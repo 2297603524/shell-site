@@ -33,7 +33,7 @@
       --dur-slow: .46s;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-overflow-scrolling: touch; }
+    html { overflow-x: hidden; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-overflow-scrolling: touch; }
     body {
       font-family: "Yuanti SC", "YouYuan", "幼圆", "PingFang SC", "Microsoft YaHei", sans-serif;
       color: var(--ink);
@@ -41,7 +41,6 @@
       display: flex;
       flex-direction: column;
       background: linear-gradient(180deg, rgba(255,233,245,.72) 0%, rgba(242,233,255,.66) 48%, rgba(226,242,255,.78) 100%);
-      overflow-x: hidden;
       -webkit-tap-highlight-color: transparent;
       -webkit-font-smoothing: antialiased;
     }
