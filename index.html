@@ -149,6 +149,34 @@
     .btn.detail { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff; border-color: transparent; margin-left: auto; }
     .vix-err { color: #d97706; font-size: 10px; width: 100%; }
 
+    /* ===== A股恐贪指数 ===== */
+    .fg-scale {
+      position: relative; height: 10px; border-radius: 999px;
+      background: linear-gradient(90deg, #e11d48 0%, #f97316 26%, #fbbf24 46%, #a3e635 62%, #16a34a 100%);
+      margin: 12px 3px 5px;
+      box-shadow: inset 0 0 0 1px rgba(90, 74, 102, .08);
+    }
+    .fg-scale i {
+      position: absolute; top: 50%; left: 50%; width: 5px; height: 20px; border-radius: 3px;
+      background: var(--ink); box-shadow: 0 0 0 2px #fff;
+      transform: translate(-50%, -50%);
+      transition: left .6s ease;
+    }
+    .fg-scale-lbl {
+      display: flex; justify-content: space-between;
+      font-size: 10px; color: var(--muted); margin-bottom: 6px;
+    }
+    .fg-c1 { color: #e11d48; }
+    .fg-c2 { color: #f97316; }
+    .fg-c3 { color: #5a4a66; }
+    .fg-c4 { color: #65a30d; }
+    .fg-c5 { color: #16a34a; }
+    .bg-c1 { color: #e11d48; border-color: #fecdd3; background: #fff1f2; }
+    .bg-c2 { color: #f97316; border-color: #fed7aa; background: #fff7ed; }
+    .bg-c3 { color: #5a4a66; border-color: #efe6f5; background: #fdfaff; }
+    .bg-c4 { color: #65a30d; border-color: #d9f99d; background: #f7fee7; }
+    .bg-c5 { color: #16a34a; border-color: #bbf7d0; background: #f0fdf4; }
+
     /* ===== 自适应：卡片越窄，排版越紧凑 ===== */
     @container (max-width: 300px) {
       .tile-title { font-size: 13px; }
@@ -237,6 +265,37 @@
             <span id="vixErr" class="vix-err"></span>
             <button class="btn" id="vixRefresh" type="button">✧ 刷新</button>
             <a class="btn detail" href="./vix.html">详细观测 →</a>
+          </div>
+        </div>
+      </section>
+      <!-- A股恐贪指数 -->
+      <section class="card tile" aria-label="A股恐贪指数">
+        <div class="tile-top">
+          <div class="tile-title">🎭 A股恐贪指数<span class="sub">上证指数情绪合成 · 自建模型</span></div>
+          <span class="badge" id="fgLevel">加载中…</span>
+        </div>
+
+        <div class="tile-mid">
+          <div class="vix-price flat" id="fgScore">--</div>
+          <div class="vix-chg flat" id="fgDelta">等待数据…</div>
+        </div>
+
+        <div class="fg-scale" aria-hidden="true"><i id="fgMark"></i></div>
+        <div class="fg-scale-lbl"><span>极度恐惧</span><span>中性</span><span>极度贪婪</span></div>
+
+        <div class="spark-link" style="cursor:default">
+          <svg id="fgSpark" viewBox="0 0 800 44" preserveAspectRatio="none" aria-label="恐贪指数近 30 日走势"></svg>
+          <span class="cap">
+            <span id="fgSparkLabel">近 30 日走势</span>
+            <span>5 分项分位合成</span>
+          </span>
+        </div>
+
+        <div class="tile-foot">
+          <div class="tile-time" id="fgTime">数据日期：--</div>
+          <div class="tile-actions">
+            <span id="fgErr" class="vix-err"></span>
+            <button class="btn" id="fgRefresh" type="button">✧ 刷新</button>
           </div>
         </div>
       </section>
@@ -336,9 +395,9 @@
     }
 
     /* ---------- 迷你走势（日频历史，低频更新） ---------- */
-    function drawSpark(pts) {
-      var el = $('spark');
-      if (!el || !pts || !pts.length) return;
+    /* ---------- 迷你走势（通用，uid 保证两卡的渐变 id 不冲突） ---------- */
+    function drawMini(svgEl, labelEl, pts, uid) {
+      if (!svgEl || !pts || !pts.length) return;
       var W = 800, H = 44, pl = 3, pr = 3, pt = 6, pb = 6;
       var vs = pts.map(function (p) { return p[1]; });
       var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
@@ -353,35 +412,87 @@
         area += (i ? 'L' : 'M') + x + ' ' + y;
       });
       area += 'L' + nx(pts.length - 1).toFixed(1) + ' ' + H + 'L' + nx(0).toFixed(1) + ' ' + H + 'Z';
-      el.innerHTML =
-        '<defs><linearGradient id="spLine" x1="0" y1="0" x2="1" y2="0">' +
+      svgEl.innerHTML =
+        '<defs><linearGradient id="' + uid + 'L" x1="0" y1="0" x2="1" y2="0">' +
         '<stop offset="0%" stop-color="#ff7eb6"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient>' +
-        '<linearGradient id="spArea" x1="0" y1="0" x2="0" y2="1">' +
+        '<linearGradient id="' + uid + 'A" x1="0" y1="0" x2="0" y2="1">' +
         '<stop offset="0%" stop-color="#ff9ecb" stop-opacity="0.32"/>' +
         '<stop offset="100%" stop-color="#c4b5fd" stop-opacity="0.03"/></linearGradient></defs>' +
-        '<path d="' + area + '" fill="url(#spArea)"/>' +
-        '<path d="' + line + '" fill="none" stroke="url(#spLine)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>';
-      var label = $('sparkLabel');
-      if (label) label.textContent = '近 30 日走势（' + pts[0][0].slice(5) + ' ~ ' + pts[pts.length - 1][0].slice(5) + '）';
+        '<path d="' + area + '" fill="url(#' + uid + 'A)"/>' +
+        '<path d="' + line + '" fill="none" stroke="url(#' + uid + 'L)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>';
+      if (labelEl) {
+        labelEl.textContent = '近 30 日走势（' + pts[0][0].slice(5) + ' ~ ' + pts[pts.length - 1][0].slice(5) + '）';
+      }
     }
 
-    function loadSpark() {
+    function loadHistory() {
       fetch('./data/vix-history.json?r=' + Date.now(), { cache: 'no-store' })
         .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(function (d) { if (d && d.points && d.points.length) drawSpark(d.points.slice(-30)); })
+        .then(function (d) { if (d && d.points && d.points.length) drawMini($('spark'), $('sparkLabel'), d.points.slice(-30), 'sp'); })
         .catch(function () {});
     }
 
-    elBtn.addEventListener('click', function () { loadAll(); loadSpark(); });
+    /* ---------- A股恐贪指数 ---------- */
+    var elFgScore = $('fgScore'), elFgDelta = $('fgDelta'), elFgLevel = $('fgLevel'),
+        elFgTime = $('fgTime'), elFgMark = $('fgMark'), elFgErr = $('fgErr'),
+        elFgBtn = $('fgRefresh'), elFgSparkLabel = $('fgSparkLabel');
+
+    function fgCls(s) {
+      if (s < 20) return 1;
+      if (s < 40) return 2;
+      if (s < 60) return 3;
+      if (s < 80) return 4;
+      return 5;
+    }
+
+    function renderFg(d) {
+      var s = parseFloat(d.score);
+      if (!isFinite(s)) return;
+      var c = fgCls(s);
+      elFgScore.textContent = s.toFixed(1);
+      elFgScore.className = 'vix-price fg-c' + c;
+      elFgLevel.textContent = d.rating_cn || '--';
+      elFgLevel.className = 'badge bg-c' + c;
+      elFgMark.style.left = Math.max(1, Math.min(99, s)) + '%';
+      elFgTime.textContent = '数据日期：' + (d.date || '--') + ' · ' + (d.index_name || '上证指数');
+
+      var pts = d.points || [];
+      if (pts.length > 6) {
+        var diff = s - parseFloat(pts[pts.length - 6][1]);
+        var sign = diff > 0 ? '+' : '';
+        elFgDelta.textContent = sign + diff.toFixed(1) + '（较 5 个交易日前）';
+        elFgDelta.className = 'vix-chg fg-c' + c;
+      } else {
+        elFgDelta.textContent = '';
+      }
+      if (pts.length) drawMini(elFgSpark(), elFgSparkLabel, pts.slice(-30), 'fg');
+    }
+
+    function elFgSpark() { return $('fgSpark'); }
+
+    function loadFg() {
+      elFgBtn.disabled = true; elFgBtn.textContent = '刷新中…';
+      fetch('./data/fear-greed.json?r=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (d) { renderFg(d); elFgErr.textContent = ''; })
+        .catch(function () { elFgErr.textContent = '⚠ 加载失败'; })
+        .finally(function () { elFgBtn.disabled = false; elFgBtn.textContent = '✧ 刷新'; });
+    }
+
+    elBtn.addEventListener('click', function () { loadAll(); loadHistory(); });
     setInterval(function () {
       if (busy) return;
       left -= 1;
       if (left <= 0) loadAll();
     }, 1000);
-    setInterval(loadSpark, 60000);   // 历史为日频数据，每分钟重取一次即可
+    setInterval(loadHistory, 60000);   // 历史为日频数据，每分钟重取一次即可
+
+    elFgBtn.addEventListener('click', loadFg);
+    setInterval(loadFg, 60000);        // 恐贪指数每日更新，低频即可
 
     loadAll();
-    loadSpark();
+    loadHistory();
+    loadFg();
   })();
   </script>
 </body>

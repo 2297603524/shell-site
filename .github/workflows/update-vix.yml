@@ -40,11 +40,16 @@ jobs:
         run: |
           python3 .github/scripts/build_indices.py data/indices.json
 
+      - name: Build A-share fear & greed index
+        continue-on-error: true
+        run: |
+          python3 .github/scripts/build_fear_greed.py data/fear-greed.json
+
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/vix.json data/vix-history.json data/vix-intraday.json data/indices.json
+          git add data/vix.json data/vix-history.json data/vix-intraday.json data/indices.json data/fear-greed.json
           if git diff --cached --quiet; then
             echo "数据无变化，跳过提交"
           else
