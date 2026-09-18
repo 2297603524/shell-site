@@ -735,7 +735,7 @@
       s += '<circle id="hoverDot" r="5" fill="#fff" stroke="#ff7eb6" stroke-width="2.4" opacity="0"/>';
 
       svg.innerHTML = s;
-      strokeReveal(document.getElementById('vixLine'), 950);
+      if (!window.__vixRevealed) { window.__vixRevealed = true; strokeReveal(document.getElementById('vixLine'), 950); }
 
       // 记录映射供 hover 使用
       svg._map = { pts: pts, nx: nx, ny: ny, x0: x0, x1: x1, W: W, H: H };

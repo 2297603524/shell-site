@@ -494,6 +494,7 @@
     var $ = function (id) { return document.getElementById(id);
  };
     var DATA = null, CUR = 0, WEIGHTS = {}, lastFngKey = '';   // 数据指纹
+    var chartRevealed = false;   // 描线动画只在首次播放，后续切换即时响应
     var PART_NAMES = {
       momentum: '价格动量', trend: '短期趋势', breadth: '均线广度',
       volatility: '波动率', volume: '量能热度', margin: '融资热度',
@@ -729,7 +730,7 @@
       svg.innerHTML = s;
 
       svg._map = { pts: p, nx: nx, ny: ny, x0: x0, x1: x1, W: W, H: H };
-      strokeReveal(document.getElementById('fngLine'), 950);
+      if (!chartRevealed) { chartRevealed = true; strokeReveal(document.getElementById('fngLine'), 950); }
 
       var it = DATA.indices[CUR];
       var full = it.fullDays ? '，全史 ' + it.fullDays + ' 个交易日' : '';

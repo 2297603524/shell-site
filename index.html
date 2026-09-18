@@ -645,7 +645,7 @@
         '<stop offset="100%" stop-color="#c4b5fd" stop-opacity="0.03"/></linearGradient></defs>' +
         '<path d="' + area + '" fill="url(#' + uid + 'A)"/>' +
         '<path d="' + line + '" fill="none" stroke="url(#' + uid + 'L)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>';
-      strokeReveal(svgEl.querySelectorAll('path')[1], 900);
+      if (!window.__miniRevealed) { window.__miniRevealed = true; strokeReveal(svgEl.querySelectorAll('path')[1], 900); }
       if (labelEl) {
         labelEl.textContent = '近 30 日走势（' + pts[0][0].slice(5) + ' ~ ' + pts[pts.length - 1][0].slice(5) + '）';
       }
