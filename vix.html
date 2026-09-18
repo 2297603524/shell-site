@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description" content="VIX 恐慌指数详细观测 —— 实时行情、120日走势、区间统计与解读。" />
-  <title>✧ VIX 恐慌指数 · 详细观测 ✧</title>
+  <title>VIX 恐慌指数 · 樱市罗盘</title>
   <style>
     :root {
       --bg-top: #ffe9f5;
@@ -246,11 +246,40 @@
       .chart-foot { font-size: 11px; }
       .tip { font-size: 11px; padding: 5px 8px; }
     }
+
+    /* ===== iOS 风格动效 ===== */
+    .card { animation: cardIn .55s cubic-bezier(.4, 0, .2, 1) both; }
+    @keyframes cardIn {
+      from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.99); }
+      to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+    }
+    .card:nth-child(1) { animation-delay: .04s; }
+    .card:nth-child(2) { animation-delay: .10s; }
+    .card:nth-child(3) { animation-delay: .16s; }
+    .card:nth-child(4) { animation-delay: .20s; }
+    header { animation: dropIn .55s cubic-bezier(.4, 0, .2, 1) both; }
+    @keyframes dropIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      .card, header { animation: none; }
+      * { transition-duration: .01ms !important; }
+    }
   </style>
 </head>
 <body>
   <header>
-    <div class="logo">✧ VIX 详细观测 ✧</div>
+    <div class="logo" style="display:flex;align-items:center;gap:7px"><svg class="logo-mark" viewBox="0 0 24 24" aria-hidden="true" style="width:18px;height:18px;flex:none">
+        <defs><linearGradient id="lgMark" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#ff7eb6"/><stop offset="100%" stop-color="#a78bfa"/>
+        </linearGradient></defs>
+        <g fill="url(#lgMark)">
+          <ellipse cx="12" cy="6.7" rx="2.5" ry="3.7"/>
+          <ellipse cx="12" cy="6.7" rx="2.5" ry="3.7" transform="rotate(72 12 12)"/>
+          <ellipse cx="12" cy="6.7" rx="2.5" ry="3.7" transform="rotate(144 12 12)"/>
+          <ellipse cx="12" cy="6.7" rx="2.5" ry="3.7" transform="rotate(216 12 12)"/>
+          <ellipse cx="12" cy="6.7" rx="2.5" ry="3.7" transform="rotate(288 12 12)"/>
+        </g>
+        <circle cx="12" cy="12" r="1.5" fill="#fff8fc"/>
+      </svg><span style="background:linear-gradient(100deg,#ff7eb6,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:700">VIX 恐慌指数</span></div>
     <a class="back" href="./index.html">← 返回首页</a>
   </header>
 
@@ -386,7 +415,7 @@
   /* ===== VIX 详情 ===== */
   (function () {
     'use strict';
-    var REFRESH_SECONDS = 1;
+    var REFRESH_SECONDS = 5;   // 全部数据每 5 秒刷新
     var left = 0, busy = false, hasData = false, backoff = false;
     var HIST = null, INTRA = null, MODE = 'day', RANGE = 60, liveDate = null, lastPlottedPrice = null;
 
@@ -676,7 +705,7 @@
     });
 
     function loadIntra() {
-      fetch('./data/vix-intraday.json?r=' + Date.now(), { cache: 'no-store' })
+      fetch('./data/vix-intraday.json', { cache: 'no-cache' })
         .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(function (d) { INTRA = d; if (MODE === 'min') drawChart(); })
         .catch(function () {});
@@ -766,7 +795,7 @@
     }
 
     function loadHist() {
-      fetch('./data/vix-history.json?r=' + Date.now(), { cache: 'no-store' })
+      fetch('./data/vix-history.json', { cache: 'no-cache' })
         .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(function (d) {
           HIST = d;
@@ -785,8 +814,8 @@
     }, 1000);
 
     // 历史（日线）为日频、分时盘中每 5 分钟更新：都按 60 秒重取即可
-    setInterval(loadHist, 60000);
-    setInterval(loadIntra, 60000);
+    setInterval(loadHist, 5000);
+    setInterval(loadIntra, 5000);
 
     elBtn.addEventListener('click', function () { loadLive(); loadHist(); loadIntra(); });
 

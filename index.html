@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="description" content="市场情绪看板 —— VIX 实时观测，数据来自 CBOE 官方。" />
-  <title>✧ 市场情绪看板 · VIX 观测所 ✧</title>
+  <meta name="description" content="樱市罗盘 —— VIX 恐慌指数与 A 股各指数恐贪指数实时观测。" />
+  <title>樱市罗盘 · 市场情绪观测站</title>
   <style>
     :root {
       --bg-top: #ffe9f5;
@@ -20,9 +20,12 @@
       --down: #0d9488;
       --shadow: 0 6px 22px rgba(255, 126, 182, 0.16);
       --radius: 18px;
+      /* iOS 风格缓动 */
+      --ease: cubic-bezier(.32, .72, 0, 1);
+      --ease-soft: cubic-bezier(.4, 0, .2, 1);
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-overflow-scrolling: touch; }
     body {
       font-family: "Yuanti SC", "YouYuan", "幼圆", "PingFang SC", "Microsoft YaHei", sans-serif;
       color: var(--ink);
@@ -35,21 +38,21 @@
       -webkit-tap-highlight-color: transparent;
       -webkit-font-smoothing: antialiased;
     }
-    /* 二次元场景背景：固定层，不随滚动，渐变遮罩保证文字可读 */
     body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      z-index: -1;
+      content: ''; position: fixed; inset: 0; z-index: -1;
       background: url('./img/bg.webp') center top / cover no-repeat;
       pointer-events: none;
     }
 
-    /* ===== 樱花 ===== */
-    .sakura { position: fixed; top: -40px; z-index: 0; pointer-events: none; user-select: none; animation: fall linear infinite; }
-    .sakura i { display: block; font-style: normal; animation: sway ease-in-out infinite alternate; }
-    @keyframes fall { to { transform: translateY(110vh) rotate(300deg); } }
-    @keyframes sway { from { transform: translateX(-14px) rotate(-18deg); } to { transform: translateX(14px) rotate(22deg); } }
+    /* ===== 樱花（GPU 加速） ===== */
+    .sakura {
+      position: fixed; top: -40px; z-index: 0; pointer-events: none; user-select: none;
+      animation: fall linear infinite;
+      will-change: transform; backface-visibility: hidden;
+    }
+    .sakura i { display: block; font-style: normal; animation: sway ease-in-out infinite alternate; will-change: transform; }
+    @keyframes fall { to { transform: translate3d(0, 110vh, 0) rotate(300deg); } }
+    @keyframes sway { from { transform: translate3d(-14px, 0, 0) rotate(-18deg); } to { transform: translate3d(14px, 0, 0) rotate(22deg); } }
     @media (prefers-reduced-motion: reduce) { .sakura { display: none; } }
 
     /* ===== 顶栏 ===== */
@@ -60,13 +63,20 @@
       background: var(--panel);
       backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
       border: 2px solid var(--line); border-radius: 999px; box-shadow: var(--shadow);
+      animation: dropIn .6s var(--ease-soft) both;
     }
-    .logo {
+    @keyframes dropIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+    .logo { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+    .logo-mark { width: 19px; height: 19px; flex: none; }
+    .logo-text {
       font-weight: 700; font-size: 16px; letter-spacing: .5px;
-      background: linear-gradient(90deg, var(--accent), var(--accent2));
-      -webkit-background-clip: text; background-clip: text; color: transparent; white-space: nowrap;
+      background: linear-gradient(100deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
     }
-    nav a { margin-left: 14px; color: var(--muted); text-decoration: none; font-size: 13px; white-space: nowrap; }
+    nav a {
+      margin-left: 14px; color: var(--muted); text-decoration: none; font-size: 13px; white-space: nowrap;
+      transition: color .2s var(--ease-soft);
+    }
     nav a:hover { color: var(--accent); }
 
     main {
@@ -82,7 +92,9 @@
       min-height: clamp(108px, 13vw, 148px);
       display: flex; align-items: center;
       margin-bottom: 14px;
+      animation: dropIn .7s var(--ease-soft) both;
     }
+
     /* ===== 卡片通用 ===== */
     .card {
       background: var(--panel);
@@ -91,16 +103,15 @@
       box-shadow: var(--shadow);
     }
 
-    /* ===== 方形卡片墙 ===== */
+    /* ===== 方格墙 ===== */
     .wall {
       display: grid;
-      /* min() 保证轨道永不宽于容器，避免被内容 min-content 撑破 */
       grid-template-columns: repeat(auto-fill, minmax(min(248px, 100%), 1fr));
       gap: 14px;
-      align-items: stretch;   /* 同行卡片等高 */
+      align-items: stretch;
     }
     .tile {
-      aspect-ratio: 1 / 1;          /* 首选正方形，装不下时自动撑高 */
+      aspect-ratio: 1 / 1;
       min-height: 236px;
       min-width: 0;
       padding: 16px 18px;
@@ -108,85 +119,90 @@
       flex-direction: column;
       position: relative;
       container-type: inline-size;
-      transition: transform .22s ease, box-shadow .22s ease;
+      animation: tileIn .6s var(--ease-soft) both;
+      transition: transform .4s var(--ease-soft), box-shadow .4s var(--ease-soft);
+      will-change: transform;
     }
-    .tile:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(255,126,182,.26); }
+    @keyframes tileIn {
+      from { opacity: 0; transform: translate3d(0, 16px, 0) scale(.98); }
+      to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+    }
+    .tile:nth-child(1) { animation-delay: .05s; }
+    .tile:nth-child(2) { animation-delay: .11s; }
+    .tile:nth-child(3) { animation-delay: .17s; }
+    .tile:nth-child(4) { animation-delay: .21s; }
+    .tile:nth-child(5) { animation-delay: .25s; }
+    .tile:nth-child(6) { animation-delay: .29s; }
 
-    /* 卡片内部统一骨架：头部 / 数值区 / 主体区(弹性) / 底部(贴底) */
+    /* 卡片骨架：头部 / 数值区 / 主体区(弹性) / 底部(贴底) */
     .tile-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; flex: none; flex-wrap: wrap; min-height: 40px; }
     .tile-title { font-weight: 700; font-size: 14px; line-height: 1.35; flex: 1; min-width: 0; }
     .tile-title .sub { display: block; color: var(--muted); font-weight: 400; font-size: 10.5px; margin-top: 2px; }
     .badge {
       font-size: 11px; padding: 3px 10px; border-radius: 999px;
       border: 2px solid var(--line); color: var(--muted); background: #fff; white-space: nowrap; flex: none;
+      transition: color .35s var(--ease-soft), border-color .35s var(--ease-soft), background-color .35s var(--ease-soft);
     }
     .b-red    { color: var(--up);   border-color: #fecdd3; background: #fff1f2; }
     .b-orange { color: #d97706;     border-color: #fde68a; background: #fffbeb; }
     .b-green  { color: var(--down); border-color: #99f6e4; background: #f0fdfa; }
 
-    /* 数值区：固定高度，保证两卡同一水平线 */
     .tile-mid { flex: none; display: flex; flex-direction: column; justify-content: center; padding: 6px 0 8px; min-height: 70px; }
-    .vix-price { font-size: clamp(36px, 8vw, 48px); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
-    .vix-chg { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 7px; white-space: nowrap; }
-    .up   { color: var(--up); }    /* 涨：红（A股惯例） */
-    .down { color: var(--down); }  /* 跌：绿 */
+    .vix-price {
+      font-size: clamp(36px, 8vw, 48px); font-weight: 700;
+      font-variant-numeric: tabular-nums; line-height: 1;
+      transition: color .35s var(--ease-soft);
+    }
+    .vix-chg {
+      font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;
+      margin-top: 7px; white-space: nowrap;
+      transition: color .35s var(--ease-soft);
+    }
+    .up   { color: var(--up); }
+    .down { color: var(--down); }
     .flat { color: var(--muted); }
 
-    /* 主体区：弹性，内容垂直居中 —— 底部区块因此天然对齐 */
     .tile-body { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; min-height: 0; }
 
     .spark-link { display: block; text-decoration: none; margin: 0; }
     .spark-link svg { width: 100%; height: 52px; display: block; }
-    .spark-link .cap { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; margin-top: 3px; flex-wrap: wrap; }
+    .spark-link .cap {
+      display: flex; justify-content: space-between; gap: 8px;
+      color: var(--muted); font-size: 10px; margin-top: 3px; flex-wrap: wrap;
+      transition: color .2s var(--ease-soft);
+    }
     .spark-link:hover .cap { color: var(--ink); }
 
     .tile-foot { margin-top: auto; padding-top: 10px; flex: none; }
-    .tile-time { color: var(--muted); font-size: 11px; margin-bottom: 7px; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tile-time {
+      color: var(--muted); font-size: 11px; margin-bottom: 7px; line-height: 1.45;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
     .tile-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .btn {
       border: 2px solid var(--line); background: #fff; color: var(--ink);
       border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 700;
-      cursor: pointer; font-family: inherit; transition: all .2s ease; text-decoration: none; white-space: nowrap;
+      cursor: pointer; font-family: inherit; text-decoration: none; white-space: nowrap;
+      transition: transform .22s var(--ease), color .2s var(--ease-soft),
+                  border-color .2s var(--ease-soft), background-color .2s var(--ease-soft);
+      will-change: transform;
     }
     .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn:active { transform: scale(.955); }
     .btn:disabled { opacity: .5; cursor: wait; }
     .btn.detail { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff; border-color: transparent; margin-left: auto; }
     .vix-err { color: #d97706; font-size: 10px; width: 100%; }
 
-    /* ===== A股恐贪指数 ===== */
-    .fg-scale {
-      position: relative; height: 10px; border-radius: 999px;
-      background: linear-gradient(90deg, #e11d48 0%, #f97316 26%, #fbbf24 46%, #a3e635 62%, #16a34a 100%);
-      margin: 2px 3px 5px;
-      box-shadow: inset 0 0 0 1px rgba(90, 74, 102, .08);
-    }
-    .fg-scale i {
-      position: absolute; top: 50%; left: 50%; width: 5px; height: 20px; border-radius: 3px;
-      background: var(--ink); box-shadow: 0 0 0 2px #fff;
-      transform: translate(-50%, -50%);
-      transition: left .6s ease;
-    }
-    .fg-scale-lbl {
-      display: flex; justify-content: space-between;
-      font-size: 10px; color: var(--muted); margin-bottom: 6px;
-    }
-    .fg-c1 { color: #e11d48; }
-    .fg-c2 { color: #f97316; }
-    .fg-c3 { color: #5a4a66; }
-    .fg-c4 { color: #65a30d; }
-    .fg-c5 { color: #16a34a; }
+    /* ===== 恐贪色阶 ===== */
+    .fg-c1 { color: #e11d48; } .fg-c2 { color: #f97316; } .fg-c3 { color: #5a4a66; }
+    .fg-c4 { color: #65a30d; } .fg-c5 { color: #16a34a; }
     .bg-c1 { color: #e11d48; border-color: #fecdd3; background: #fff1f2; }
     .bg-c2 { color: #f97316; border-color: #fed7aa; background: #fff7ed; }
     .bg-c3 { color: #5a4a66; border-color: #efe6f5; background: #fdfaff; }
     .bg-c4 { color: #65a30d; border-color: #d9f99d; background: #f7fee7; }
     .bg-c5 { color: #16a34a; border-color: #bbf7d0; background: #f0fdf4; }
-    .fg-list-title { font-size: 10px; color: var(--muted); margin: 6px 0 3px; }
-    .fg-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 10.5px; margin-top: 5px; }
-    .fg-item { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; }
-    .fg-item b { font-weight: 400; color: var(--muted); white-space: nowrap; }
-    .fg-item i { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-    /* ===== 预留占位卡（骨架与真实卡片一致） ===== */
+    /* ===== 预留占位卡 ===== */
     .tile-empty {
       border-style: dashed;
       background: rgba(255, 255, 255, .42);
@@ -201,12 +217,21 @@
       background: repeating-linear-gradient(90deg, transparent 0 14px, rgba(255, 215, 236, .5) 14px 15px);
     }
 
-    /* ===== 自适应：卡片越窄，排版越紧凑 ===== */
+    /* ===== 触摸设备：不保留 hover 悬浮态 ===== */
+    @media (hover: none) {
+      .tile:hover { transform: none; box-shadow: var(--shadow); }
+      .btn:hover { border-color: var(--line); color: var(--ink); }
+      .btn.detail:hover { color: #fff; }
+      nav a:hover { color: var(--muted); }
+      .spark-link:hover { color: var(--muted); }
+    }
+
+    /* ===== 容器查询：窄卡收紧排版 ===== */
     @container (max-width: 300px) {
       .tile-title { font-size: 13px; }
       .vix-price { font-size: 34px; }
-      .vix-chg { font-size: 14px; }
-      .spark-link svg { height: 32px; }
+      .vix-chg { font-size: 13px; }
+      .spark-link svg { height: 40px; }
       .spark-link .cap, .tile-time { font-size: 10px; }
       .btn { padding: 4px 10px; font-size: 11px; }
     }
@@ -214,45 +239,54 @@
       .tile-title .sub { display: none; }
       .vix-price { font-size: 30px; }
       .spark-link .cap { display: none; }
-      .tile-time { margin-bottom: 6px; }
     }
-    /* ===== 触摸设备优化 ===== */
-    /* 触摸屏没有真正的 hover，点完会「卡住」在悬浮态 —— 取消 hover 效果，改用按下反馈 */
-    @media (hover: none) {
-      .tile:hover { transform: none; box-shadow: var(--shadow); }
-      .btn:hover { border-color: var(--line); color: var(--ink); }
-      .btn.detail:hover { color: #fff; }
-      nav a:hover { color: var(--muted); }
-      .spark-link:hover { color: var(--muted); }
-      .spark-link:hover .arrow { transform: none; }
-    }
-    .tile:active { transform: scale(.985); }
-    .btn:active { transform: scale(.96); }
 
-    /* 窄屏：取消正方形、单列铺开、触控目标放大 */
+    /* ===== 手机端 ===== */
     @media (max-width: 480px) {
       .tile { aspect-ratio: auto; min-height: 0; padding: 16px; }
       .wall { grid-template-columns: 1fr; gap: 12px; }
       main { padding: 12px 12px calc(28px + env(safe-area-inset-bottom)); }
       header { margin: 8px 8px 0; padding: 8px 14px; top: calc(6px + env(safe-area-inset-top)); }
-      .logo { font-size: 13px; letter-spacing: 0; }
+      .logo-text { font-size: 14px; }
       nav a { font-size: 13px; margin-left: 12px; }
       .hero { min-height: 104px; border-width: 2px; border-radius: 14px; }
       .vix-price { font-size: 42px; }
       .vix-chg { font-size: 16px; }
       .badge { font-size: 12px; padding: 4px 12px; }
-      /* 触控目标放大到 ≥40px 高 */
       .btn { padding: 9px 16px; font-size: 13px; }
       .tile-actions { gap: 8px; }
       .tile-time { font-size: 11.5px; }
       .spark-link svg { height: 52px; }
       .spark-link .cap { font-size: 11px; }
     }
+
+    /* ===== 尊重减弱动效偏好 ===== */
+    @media (prefers-reduced-motion: reduce) {
+      .tile, header, .hero { animation: none; }
+      * { transition-duration: .01ms !important; }
+    }
   </style>
 </head>
 <body>
   <header>
-    <div class="logo">✧ SAKURA SHELL ✧</div>
+    <div class="logo">
+      <svg class="logo-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <defs>
+          <linearGradient id="lgMark" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ff7eb6"/><stop offset="100%" stop-color="#a78bfa"/>
+          </linearGradient>
+        </defs>
+        <g fill="url(#lgMark)">
+          <ellipse cx="12" cy="6.7" rx="2.5" ry="3.7"/>
+          <ellipse cx="12" cy="6.7" rx="2.5" ry="3.7" transform="rotate(72 12 12)"/>
+          <ellipse cx="12" cy="6.7" rx="2.5" ry="3.7" transform="rotate(144 12 12)"/>
+          <ellipse cx="12" cy="6.7" rx="2.5" ry="3.7" transform="rotate(216 12 12)"/>
+          <ellipse cx="12" cy="6.7" rx="2.5" ry="3.7" transform="rotate(288 12 12)"/>
+        </g>
+        <circle cx="12" cy="12" r="1.5" fill="#fff8fc"/>
+      </svg>
+      <span class="logo-text">樱市罗盘</span>
+    </div>
     <nav>
       <a href="./index.html">🌸 看板</a>
       <a href="./vix.html">📈 VIX 详情</a>
@@ -263,18 +297,16 @@
     <section class="hero" aria-hidden="true"></section>
 
     <div class="wall">
-      <!-- VIX 方形卡 -->
+      <!-- VIX 卡 -->
       <section class="card tile" aria-label="VIX 恐慌指数">
         <div class="tile-top">
           <div class="tile-title">📈 VIX 恐慌指数<span class="sub">30 天隐含波动率 · SPX</span></div>
           <span class="badge" id="vixLevel">观测中…</span>
         </div>
-
         <div class="tile-mid">
           <div class="vix-price flat" id="vixPrice">--.--</div>
           <div class="vix-chg flat" id="vixChg">等待数据…</div>
         </div>
-
         <div class="tile-body">
           <a class="spark-link" href="./vix.html" title="查看 VIX 完整历史">
             <svg id="spark" viewBox="0 0 800 44" preserveAspectRatio="none" aria-label="VIX 近 30 日走势"></svg>
@@ -284,9 +316,8 @@
             </span>
           </a>
         </div>
-
         <div class="tile-foot">
-          <div class="tile-time" id="vixTime">最后成交：--</div>
+          <div class="tile-time" id="vixTime">最后成交 --</div>
           <div class="tile-actions">
             <span id="vixErr" class="vix-err"></span>
             <button class="btn" id="vixRefresh" type="button">✧ 刷新</button>
@@ -294,18 +325,17 @@
           </div>
         </div>
       </section>
-      <!-- A股恐贪指数 -->
+
+      <!-- A股恐贪指数卡 -->
       <section class="card tile" aria-label="A股恐贪指数">
         <div class="tile-top">
-          <div class="tile-title">🎭 A股恐贪指数<span class="sub">9 分项多维模型 · 含估值分位</span></div>
+          <div class="tile-title">🎭 A股恐贪指数<span class="sub">9 分项加权模型 · 近 3 年分位</span></div>
           <span class="badge" id="fgLevel">加载中…</span>
         </div>
-
         <div class="tile-mid">
           <div class="vix-price flat" id="fgScore">--</div>
           <div class="vix-chg flat" id="fgDelta">等待数据…</div>
         </div>
-
         <div class="tile-body">
           <a class="spark-link" href="./fng.html" title="查看各指数详情">
             <svg id="fgSpark" viewBox="0 0 800 44" preserveAspectRatio="none" aria-label="恐贪指数近 30 日走势"></svg>
@@ -315,9 +345,8 @@
             </span>
           </a>
         </div>
-
         <div class="tile-foot">
-          <div class="tile-time" id="fgTime">数据日期：--</div>
+          <div class="tile-time" id="fgTime">数据日期 --</div>
           <div class="tile-actions">
             <span id="fgErr" class="vix-err"></span>
             <button class="btn" id="fgRefresh" type="button">✧ 刷新</button>
@@ -326,7 +355,7 @@
         </div>
       </section>
 
-      <!-- 预留占位卡 ×4：骨架与真实卡片完全一致，后续添加指标时替换内容即可 -->
+      <!-- 预留占位卡 ×4 -->
       <section class="card tile tile-empty" aria-hidden="true">
         <div class="tile-top">
           <div class="tile-title">＋ 预留指标<span class="sub">等待接入数据</span></div>
@@ -378,23 +407,23 @@
         <div class="tile-body"><div class="ph-chart"></div></div>
         <div class="tile-foot"><div class="tile-time">占位 · 骨架与其他卡片一致</div></div>
       </section>
-      <!-- 后续指标卡直接往这里加，会自动铺成方格墙 -->
     </div>
   </main>
 
   <script>
-  /* ===== 樱花飘落 ===== */
+  /* ===== 樱花飘落（小屏减少粒子，GPU 加速） ===== */
   (function () {
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var COUNT = (window.innerWidth < 640) ? 6 : 12;
     var GLYPHS = ['🌸', '❀', '✿', '🌸', '❀'];
     var colors = ['#ffb7d9', '#ffc7e5', '#f5c7ff', '#ffd6ea'];
-    var COUNT = (window.innerWidth < 640) ? 8 : 14;   // 小屏减少粒子，省电省性能
+    var frag = document.createDocumentFragment();
     for (var i = 0; i < COUNT; i++) {
       var s = document.createElement('span');
       s.className = 'sakura';
-      var dur = 9 + Math.random() * 10;
+      var dur = 10 + Math.random() * 10;
       s.style.left = (Math.random() * 100) + 'vw';
-      s.style.fontSize = (10 + Math.random() * 15) + 'px';
+      s.style.fontSize = (10 + Math.random() * 14) + 'px';
       s.style.color = colors[Math.floor(Math.random() * colors.length)];
       s.style.animationDuration = dur + 's';
       s.style.animationDelay = (-Math.random() * dur) + 's';
@@ -403,78 +432,44 @@
       inner.textContent = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
       inner.style.animationDuration = (1.6 + Math.random() * 2) + 's';
       s.appendChild(inner);
-      document.body.appendChild(s);
+      frag.appendChild(s);
     }
+    document.body.appendChild(frag);
   })();
 
-  /* ===== VIX 卡片数据 ===== */
+  /* ===== 看板数据：单文件 summary.json（约 2KB），全部数据每 5 秒刷新 ===== */
   (function () {
     'use strict';
-    var REFRESH_SECONDS = 1;
-    var left = 0, busy = false, hasData = false, backoff = false;
-    var DATA_URL = './data/vix.json';   // 单指标实时快照
+    var REFRESH_MS = 5000;
+    var busy = false, hasData = false, backoff = false;
 
     var $ = function (id) { return document.getElementById(id); };
-    var elPrice = $('vixPrice'), elChg = $('vixChg'), elTime = $('vixTime'), elLevel = $('vixLevel'),
-        elErr = $('vixErr'), elBtn = $('vixRefresh');
+    var elVixPrice = $('vixPrice'), elVixChg = $('vixChg'), elVixTime = $('vixTime'),
+        elVixLevel = $('vixLevel'), elVixErr = $('vixErr'), elVixBtn = $('vixRefresh'),
+        elFgScore = $('fgScore'), elFgDelta = $('fgDelta'), elFgLevel = $('fgLevel'),
+        elFgTime = $('fgTime'), elFgErr = $('fgErr'), elFgBtn = $('fgRefresh');
 
     function setCls(el, c) { el.classList.remove('up', 'down', 'flat'); el.classList.add(c); }
     function f2(n, d) {
       return Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
     }
-    function fmtTime(t) { return (t || '--').replace('T', ' '); }
+    function fmt(t) { return (t || '--').replace('T', ' '); }
 
-    function levelInfo(v) {
+    function vixLevelOf(v) {
       if (v >= 30) return ['极度恐慌 (╥﹏╥)', 'b-red'];
       if (v >= 20) return ['恐慌升温 (ﾟДﾟ;)', 'b-orange'];
       if (v >= 15) return ['情绪中性 (・_・;)', ''];
       return ['市场平静 (´▽`)', 'b-green'];
     }
-
-    function render(d) {
-      var price = parseFloat(d.price), prev = parseFloat(d.prev_close);
-      var chg = parseFloat(d.change), pct = parseFloat(d.change_percent);
-      if (!isFinite(price)) return;
-      if (!isFinite(chg)) chg = price - prev;
-      if (!isFinite(pct)) pct = prev ? (chg / prev) * 100 : 0;
-
-      var dirCls = chg > 0 ? 'up' : (chg < 0 ? 'down' : 'flat');
-      setCls(elPrice, dirCls);
-      elPrice.textContent = f2(price, 2);
-      if (chg === 0 && pct === 0) {
-        elChg.textContent = '0.00 (0.00%)';
-        setCls(elChg, 'flat');
-      } else {
-        var sign = chg > 0 ? '+' : '';
-        elChg.textContent = sign + f2(chg, 2) + ' (' + sign + f2(pct, 2) + '%)';
-        setCls(elChg, dirCls);
-      }
-      elTime.textContent = '最后成交 ' + fmtTime(d.last_trade_time).slice(5, 16) + '（美东）· CBOE';
-      var info = levelInfo(price);
-      elLevel.textContent = info[0];
-      elLevel.className = 'badge ' + info[1];
-      hasData = true;
+    function fgCls(s) {
+      if (s < 20) return 1;
+      if (s < 40) return 2;
+      if (s < 60) return 3;
+      if (s < 80) return 4;
+      return 5;
     }
 
-    function loadAll() {
-      if (busy) return;
-      busy = true; backoff = false;
-      elBtn.disabled = true; elBtn.textContent = '刷新中…';
-      fetch(DATA_URL + '?r=' + Date.now(), { cache: 'no-store' })
-        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(function (d) { render(d); elErr.textContent = ''; })
-        .catch(function () {
-          backoff = true;
-          elErr.textContent = hasData ? '⚠ 数据源暂不可用，显示上次数据' : '⚠ 加载失败，稍后重试';
-        })
-        .finally(function () {
-          busy = false; elBtn.disabled = false; elBtn.textContent = '✧ 刷新';
-          left = backoff ? Math.max(REFRESH_SECONDS, 10) : REFRESH_SECONDS;
-        });
-    }
-
-    /* ---------- 迷你走势（日频历史，低频更新） ---------- */
-    /* ---------- 迷你走势（通用，uid 保证两卡的渐变 id 不冲突） ---------- */
+    /* ---------- 迷你走势（uid 保证两卡渐变 id 不冲突） ---------- */
     function drawMini(svgEl, labelEl, pts, uid) {
       if (!svgEl || !pts || !pts.length) return;
       var W = 800, H = 44, pl = 3, pr = 3, pt = 6, pb = 6;
@@ -504,79 +499,86 @@
       }
     }
 
-    function loadHistory() {
-      fetch('./data/vix-history.json?r=' + Date.now(), { cache: 'no-store' })
-        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(function (d) { if (d && d.points && d.points.length) drawMini($('spark'), $('sparkLabel'), d.points.slice(-30), 'sp'); })
-        .catch(function () {});
+    /* ---------- 渲染 ---------- */
+    function renderVix(d) {
+      var price = parseFloat(d.price), prev = parseFloat(d.prev);
+      var chg = parseFloat(d.change), pct = parseFloat(d.pct);
+      if (!isFinite(price)) return;
+      if (!isFinite(chg)) chg = price - prev;
+      if (!isFinite(pct)) pct = prev ? (chg / prev) * 100 : 0;
+
+      var dirCls = chg > 0 ? 'up' : (chg < 0 ? 'down' : 'flat');
+      setCls(elVixPrice, dirCls);
+      elVixPrice.textContent = f2(price, 2);
+      if (chg === 0 && pct === 0) {
+        elVixChg.textContent = '0.00 (0.00%)';
+        setCls(elVixChg, 'flat');
+      } else {
+        var sign = chg > 0 ? '+' : '';
+        elVixChg.textContent = sign + f2(chg, 2) + ' (' + sign + f2(pct, 2) + '%)';
+        setCls(elVixChg, dirCls);
+      }
+      elVixTime.textContent = '最后成交 ' + fmt(d.time).slice(5, 16) + '（美东）· CBOE';
+      var info = vixLevelOf(price);
+      elVixLevel.textContent = info[0];
+      elVixLevel.className = 'badge ' + info[1];
+      if (d.spark) drawMini($('spark'), $('sparkLabel'), d.spark, 'sp');
     }
 
-    /* ---------- A股恐贪指数 ---------- */
-    var elFgScore = $('fgScore'), elFgDelta = $('fgDelta'), elFgLevel = $('fgLevel'),
-        elFgTime = $('fgTime'), elFgErr = $('fgErr'), elFgBtn = $('fgRefresh'),
-        elFgSparkLabel = $('fgSparkLabel');
-
-    function fgCls(s) {
-      if (s < 20) return 1;
-      if (s < 40) return 2;
-      if (s < 60) return 3;
-      if (s < 80) return 4;
-      return 5;
-    }
-
-    function renderFg(d) {
-      var list = d.indices || [];
-      if (!list.length) return;
-      var main = list[0];                       // 主指数（上证指数）
-      var s = parseFloat(main.score);
+    function renderFng(d) {
+      var s = parseFloat(d.score);
       if (!isFinite(s)) return;
       var c = fgCls(s);
-
       elFgScore.textContent = s.toFixed(1);
       elFgScore.className = 'vix-price fg-c' + c;
-      elFgLevel.textContent = main.rating_cn || '--';
+      elFgLevel.textContent = d.rating_cn || '--';
       elFgLevel.className = 'badge bg-c' + c;
-      var pnum = main.parts ? Object.keys(main.parts).length : 0;
-      elFgTime.textContent = '数据日期 ' + (d.date || '--') + (pnum ? ' · ' + pnum + ' 分项合成' : '');
 
-      var pts = main.points || [];
-      if (pts.length > 6) {
-        var diff = s - parseFloat(pts[pts.length - 6][1]);
-        var sign = diff > 0 ? '+' : '';
-        elFgDelta.textContent = sign + diff.toFixed(1) + ' · 较 5 个交易日前';
+      var dv = parseFloat(d.delta5);
+      if (isFinite(dv)) {
+        elFgDelta.textContent = (dv > 0 ? '+' : '') + dv.toFixed(1) + ' · 较 5 个交易日前';
         elFgDelta.className = 'vix-chg fg-c' + c;
       } else {
         elFgDelta.textContent = '';
       }
-
-      if (pts.length) drawMini(elFgSpark(), elFgSparkLabel, pts.slice(-30), 'fg');
+      elFgTime.textContent = '数据日期 ' + (d.date || '--') + (d.n ? ' · ' + d.n + ' 分项合成' : '');
+      if (d.spark) drawMini($('fgSpark'), $('fgSparkLabel'), d.spark, 'fg');
     }
 
-    function elFgSpark() { return $('fgSpark'); }
-
-    function loadFg() {
-      elFgBtn.disabled = true; elFgBtn.textContent = '刷新中…';
-      fetch('./data/fear-greed.json?r=' + Date.now(), { cache: 'no-store' })
-        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(function (d) { renderFg(d); elFgErr.textContent = ''; })
-        .catch(function () { elFgErr.textContent = '⚠ 加载失败'; })
-        .finally(function () { elFgBtn.disabled = false; elFgBtn.textContent = '✧ 刷新'; });
-    }
-
-    elBtn.addEventListener('click', function () { loadAll(); loadHistory(); });
-    setInterval(function () {
+    function loadAll() {
       if (busy) return;
-      left -= 1;
-      if (left <= 0) loadAll();
-    }, 1000);
-    setInterval(loadHistory, 60000);   // 历史为日频数据，每分钟重取一次即可
+      busy = true;
+      elVixBtn.disabled = true;
+      elFgBtn.disabled = true;
+      fetch('./data/summary.json?r=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (d) {
+          if (d.vix) renderVix(d.vix);
+          if (d.fng) renderFng(d.fng);
+          elVixErr.textContent = '';
+          elFgErr.textContent = '';
+          hasData = true;
+          backoff = false;
+        })
+        .catch(function () {
+          backoff = true;
+          var msg = hasData ? '⚠ 数据源暂不可用，显示上次数据' : '⚠ 加载失败，稍后重试';
+          elVixErr.textContent = msg;
+          elFgErr.textContent = msg;
+        })
+        .finally(function () {
+          busy = false;
+          elVixBtn.disabled = false;
+          elFgBtn.disabled = false;
+        });
+    }
 
-    elFgBtn.addEventListener('click', loadFg);
-    setInterval(loadFg, 60000);        // 恐贪指数每日更新，低频即可
+    elVixBtn.addEventListener('click', loadAll);
+    elFgBtn.addEventListener('click', loadAll);
 
+    setInterval(function () { if (!backoff) loadAll(); }, REFRESH_MS);   // 正常：5 秒
+    setInterval(function () { if (backoff) loadAll(); }, 15000);         // 失败退避：15 秒
     loadAll();
-    loadHistory();
-    loadFg();
   })();
   </script>
 </body>
