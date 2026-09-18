@@ -66,6 +66,18 @@
       92%  { opacity: var(--op, .8); }
       100% { transform: translate3d(calc(var(--drift, 18px) * -0.5), 112vh, 0) rotate(330deg); opacity: 0; }
     }
+
+    /* ===== 滚动显现：元素滚入视口时依次浮现（iOS 列表滚动的核心质感） ===== */
+    .tile, .card, .hero {
+      opacity: 0;
+      transform: translate3d(0, 16px, 0) scale(.985);
+      transition: opacity .55s var(--spring-soft), transform .55s var(--spring-soft);
+      transition-delay: var(--rd, 0s);
+    }
+    .in { opacity: 1 !important; transform: none !important; }
+    /* 同批次的轻微错峰 */
+    .in:nth-child(2 of .in) { transition-delay: .04s; }
+
     @media (prefers-reduced-motion: reduce) { .sakura { display: none; } }
 
     /* ===== 顶栏 ===== */
@@ -287,20 +299,9 @@
     /* 卡片入场：位移更小、时长更短、弹簧收尾（不再是生硬的线性位移） */
     .tile {
       contain: layout style;
-      animation: tileIn var(--dur-slow) var(--spring-soft) both;
       transition: transform var(--dur-base) var(--spring-soft);
       will-change: transform, opacity;
     }
-    @keyframes tileIn {
-      0%   { opacity: 0; transform: translate3d(0, 12px, 0) scale(.975); }
-      100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-    }
-    .tile:nth-child(1) { animation-delay: .02s; }
-    .tile:nth-child(2) { animation-delay: .06s; }
-    .tile:nth-child(3) { animation-delay: .10s; }
-    .tile:nth-child(4) { animation-delay: .13s; }
-    .tile:nth-child(5) { animation-delay: .16s; }
-    .tile:nth-child(6) { animation-delay: .19s; }
 
     /* 入场结束后解除 will-change，避免长期占用合成层 */
     .tile.settled { will-change: auto; }
@@ -343,6 +344,7 @@
        （旧写法用 * { transition-duration:.01ms } 会把整站过渡全部干掉） */
     @media (prefers-reduced-motion: reduce) {
       .tile, header, .hero, .card, .sakura { animation: none !important; }
+      .tile, .card, .hero { opacity: 1 !important; transform: none !important; }
       ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
       .btn, .rbtn, .back { transition-duration: .14s !important; }
       .vix-price, .vix-chg, .price-big, .price-chg { transition-duration: .14s !important; }
@@ -1069,6 +1071,23 @@
       clearTimeout(t);
       t = setTimeout(function () { setAll('running'); }, 280);
     }, { passive: true });
+  })();
+
+  /* ===== 滚动显现：进入视口才播放入场（IntersectionObserver） ===== */
+  (function () {
+    var els = document.querySelectorAll('.tile, .card, .hero');
+    var done = function () {
+      for (var i = 0; i < els.length; i++) els[i].classList.add('in');
+    };
+    if (!('IntersectionObserver' in window)) { done(); return; }
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) { done(); return; }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -4% 0px' });
+    for (var j = 0; j < els.length; j++) io.observe(els[j]);
   })();
 </script>
 </body>
