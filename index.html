@@ -398,6 +398,12 @@
     @media (max-width: 640px) {
       .hero { background-image: url("./img/banner-sm.webp"); }
     }
+
+    /* ===== 手机端防误触：卡片与按钮禁文本选择/长按菜单 ===== */
+    .tile, .btn, .rbtn, .badge, .back, .logo, .part-row, .seg {
+      -webkit-user-select: none; user-select: none;
+      -webkit-touch-callout: none;
+    }
   </style>
 </head>
 <body>

@@ -166,7 +166,12 @@
     .part-row.is-ref .part-bar i { background: linear-gradient(90deg, #d9c9ea, #e8dff4); }
 
     /* 图表 */
-    .chart-wrap { position: relative; }
+    .chart-wrap {
+      position: relative;
+      touch-action: pan-y;
+      -webkit-user-select: none; user-select: none;
+      -webkit-touch-callout: none;   /* 禁长按弹出菜单/选择放大镜 */
+    }
     .chart-wrap svg { width: 100%; height: auto; display: block; touch-action: pan-y; }
     .tip {
       position: absolute; pointer-events: none; opacity: 0;
@@ -318,6 +323,12 @@
     /* 手机端用小尺寸 banner（省 ~160KB 传输与解码） */
     @media (max-width: 640px) {
       .hero { background-image: url("./img/banner-sm.webp"); }
+    }
+
+    /* ===== 手机端防误触：卡片与按钮禁文本选择/长按菜单 ===== */
+    .tile, .btn, .rbtn, .badge, .back, .logo, .part-row, .seg {
+      -webkit-user-select: none; user-select: none;
+      -webkit-touch-callout: none;
     }
   </style>
 </head>
@@ -789,8 +800,12 @@
 
     wrap.addEventListener('mousemove', onMove);
     wrap.addEventListener('mouseleave', hideHover);
-    wrap.addEventListener('touchstart', function (e) { if (e.touches[0]) onMove(e.touches[0]); }, { passive: true });
-    wrap.addEventListener('touchmove', function (e) { if (e.touches[0]) onMove(e.touches[0]); }, { passive: true });
+    wrap.addEventListener('touchstart', function (e) {
+      if (e.touches[0]) { e.preventDefault(); onMove(e.touches[0]); }
+    }, { passive: false });   // preventDefault：阻止文本选择与放大镜
+    wrap.addEventListener('touchmove', function (e) {
+      if (e.touches[0]) { e.preventDefault(); onMove(e.touches[0]); }
+    }, { passive: false });
     wrap.addEventListener('touchend', hideHover);
 
     var rsTimer = null;
