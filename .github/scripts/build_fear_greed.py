@@ -18,7 +18,7 @@
 输出采样（控制体积同时保留完整时间跨度）:
     近 RECENT_DAYS(250) 个交易日 → 全部日线点
     更早 → 每月最后一个交易日
-    points: [[日期, 恐贪值, 收盘点位, 当日分项数], ...]
+    points: [[日期, 恐贪值, 收盘点位, 当日分项数, 粒度], ...]   粒度: "d"=日线, "m"=月线
 
 用法:
     python build_fear_greed.py [输出json路径]   默认 data/fear-greed.json
@@ -76,7 +76,7 @@ KLIMIT = 9000        # 日K 抓取上限（覆盖上证指数 1990 年至今）
 MARGIN_PAGES = 9     # 融资数据页数（9×500=4500 条，覆盖 2010 年至今）
 WINDOW = 750         # 价格类分位窗口 = 近 3 年
 VAL_WINDOW = 60      # 估值分位窗口 = 近 60 个月
-RECENT_DAYS = 250    # 近期保留日线点的天数，更早按月采样
+RECENT_DAYS = 500    # 近期保留日线点的天数（约 2 年），更早按月采样
 
 PRICE_KEYS = ["momentum", "trend", "breadth", "volatility", "volume", "drawdown"]
 EXTRA_KEYS = ["margin", "riskon"]
@@ -359,7 +359,9 @@ def compute(dates, closes, vols, margin_by_date, small, large, val_by_month):
         return None
 
     sel = sample_rows(rows)
-    points = [[rows[j]["date"], rows[j]["score"], round(rows[j]["close"], 2), rows[j]["n"]] for j in sel]
+    daily_from = len(rows) - RECENT_DAYS
+    points = [[rows[j]["date"], rows[j]["score"], round(rows[j]["close"], 2), rows[j]["n"],
+               "d" if j >= daily_from else "m"] for j in sel]
 
     last = rows[-1]
     rating, rating_cn = rating_of(last["score"])
@@ -416,7 +418,7 @@ def main() -> None:
         "model": ("价格动量 / 短期趋势 / 均线广度 / 波动率(反向) / 量能热度 / 融资热度 / "
                   "风险偏好 / 回撤深度 / 估值分位(PE-TTM 近 60 个月)"),
         "window": "价格类取近 3 年（750 交易日）滚动分位；估值取近 60 个月 PE 分位",
-        "sampling": "近 250 个交易日为日线，更早按每月最后一个交易日采样（时间跨度覆盖指数成立以来）",
+        "sampling": "近 %d 个交易日为日线（标记 d），更早按每月最后一个交易日采样（标记 m）；时间跨度覆盖指数成立以来" % RECENT_DAYS,
         "indices": out_indices,
     }
 

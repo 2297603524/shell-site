@@ -91,6 +91,18 @@
     @media (hover: none) { .rbtn:hover { color: var(--muted); } }
     .rbtn:active { transform: scale(.96); }
 
+    /* 区间选择控件行（与 VIX 详情页同一套样式） */
+    .ctrl-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px 16px; flex-wrap: wrap; margin-bottom: 12px;
+    }
+    .ctrl-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .ctrl-lbl {
+      font-size: 12px; font-weight: 700; color: var(--muted);
+      background: #fff; border: 1px dashed var(--line);
+      border-radius: 6px; padding: 3px 7px; white-space: nowrap;
+    }
+
     /* 总览 */
     .ov { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
     .ov-left { flex: 1 1 auto; min-width: 0; }
@@ -213,12 +225,32 @@
     <!-- 走势 -->
     <section class="card">
       <div class="card-title">📈 恐贪指数走势 <span class="sub" id="chartSub">加载中…</span></div>
+      <div class="ctrl-row">
+        <span class="ctrl-group">
+          <span class="ctrl-lbl">周期</span>
+          <span class="seg" id="periodSeg">
+            <button class="rbtn on" data-period="day" type="button">日线</button>
+            <button class="rbtn" data-period="week" type="button">周线</button>
+          </span>
+        </span>
+        <span class="ctrl-group">
+          <span class="ctrl-lbl">区间</span>
+          <span class="seg" id="rangeSeg">
+            <button class="rbtn" data-range="30" type="button">30日</button>
+            <button class="rbtn" data-range="60" type="button">60日</button>
+            <button class="rbtn" data-range="120" type="button">120日</button>
+            <button class="rbtn on" data-range="365" type="button">1年</button>
+            <button class="rbtn" data-range="1825" type="button">5年</button>
+            <button class="rbtn" data-range="0" type="button">全部</button>
+          </span>
+        </span>
+      </div>
       <div class="chart-wrap" id="chartWrap">
         <div class="tip" id="chartTip"></div>
         <svg id="chartSvg" viewBox="0 0 820 300" aria-label="恐贪指数走势"></svg>
       </div>
       <div class="chart-foot">
-        <span>左轴：恐贪 0~100（20/40/60/80 分档）　灰虚线：指数点位（右轴，长周期为对数刻度）　近 250 日为日线、更早按月采样</span>
+        <span>左轴：恐贪 0~100（20/40/60/80 分档）　灰虚线：指数点位（右轴，长周期为对数刻度）　数据近 2 年为日线、更早按月采样</span>
         <span>悬停或滑动查看数值</span>
       </div>
     </section>
@@ -368,10 +400,64 @@
       return { W: 820, H: 300, PAD: { l: 46, r: 66, t: 18, b: 34 } };
     }
 
+    /* 周期 day|week；区间 0=全部，<=120 按点数（近 2 年的点均为日线），更长按日历天过滤 */
+    var RANGE = 365, PERIOD = 'day';
+
+    // 周线：日线点每 5 个合并为 1 个（保留每 5 个的最后一个 + 末点），月线点原样保留
+    function applyPeriod(p) {
+      if (PERIOD !== 'week') return p;
+      var di = [];
+      p.forEach(function (x, i) { if ((x[4] || 'd') === 'd') di.push(i); });
+      if (di.length < 10) return p;
+      var keep = {};
+      di.forEach(function (i, k) { keep[i] = (k % 5 === 4) || (k === di.length - 1); });
+      return p.filter(function (x, i) { return (x[4] || 'd') === 'm' || keep[i]; });
+    }
+
     function pts() {
       var it = DATA && DATA.indices && DATA.indices[CUR];
-      return (it && it.points) ? it.points : [];
+      var all = (it && it.points) ? it.points : [];
+      if (!all.length) return all;
+      var out = all;
+      if (RANGE) {
+        if (RANGE <= 120) {
+          out = all.slice(-RANGE);
+        } else {
+          var lastMs = Date.parse(all[all.length - 1][0] + 'T00:00:00Z');
+          var cutoff = new Date(lastMs - RANGE * 86400000).toISOString().slice(0, 10);
+          var f = all.filter(function (x) { return x[0] >= cutoff; });
+          out = f.length >= 3 ? f : all.slice(-3);
+        }
+      }
+      return applyPeriod(out);
     }
+
+    (function bindControls() {
+      var seg = $('rangeSeg');
+      if (seg) {
+        Array.prototype.forEach.call(seg.querySelectorAll('.rbtn'), function (b) {
+          b.addEventListener('click', function () {
+            Array.prototype.forEach.call(seg.querySelectorAll('.rbtn'), function (x) { x.classList.remove('on'); });
+            b.classList.add('on');
+            RANGE = parseInt(b.getAttribute('data-range'), 10) || 0;
+            hideHover();
+            drawChart();
+          });
+        });
+      }
+      var pseg = $('periodSeg');
+      if (pseg) {
+        Array.prototype.forEach.call(pseg.querySelectorAll('.rbtn'), function (b) {
+          b.addEventListener('click', function () {
+            Array.prototype.forEach.call(pseg.querySelectorAll('.rbtn'), function (x) { x.classList.remove('on'); });
+            b.classList.add('on');
+            PERIOD = b.getAttribute('data-period') || 'day';
+            hideHover();
+            drawChart();
+          });
+        });
+      }
+    })();
 
     function drawChart() {
       var p = pts();
@@ -460,8 +546,9 @@
 
       var it = DATA.indices[CUR];
       var full = it.fullDays ? '，全史 ' + it.fullDays + ' 个交易日' : '';
+      var ptype = (PERIOD === 'week') ? '周线' : '日线';
       $('chartSub').textContent = '（' + it.name + '，' + p[0][0] + ' ~ ' + p[p.length - 1][0]
-        + '，共 ' + p.length + ' 个点' + full + '）';
+        + '，' + ptype + ' ' + p.length + ' 个点' + full + '）';
 
       if (lastHoverIdx !== null) applyHover(Math.min(lastHoverIdx, p.length - 1));
     }
@@ -537,10 +624,31 @@
         .catch(function () { $('curErr').textContent = '⚠ 数据加载失败'; });
     }
 
-    // ?idx=2 直达某指数（也便于无头验证）
+    // ?idx=2 直达某指数、?range=30|60|120|365|1825|0 直达区间（也便于无头验证）
     (function initIdx() {
       var m = /[?&]idx=(\d+)/.exec(location.search);
       if (m) CUR = parseInt(m[1], 10) || 0;
+      var r = /[?&]range=(\d+)/.exec(location.search);
+      if (r) {
+        var rv = parseInt(r[1], 10) || 0;
+        RANGE = rv;
+        var seg = $('rangeSeg');
+        if (seg) {
+          Array.prototype.forEach.call(seg.querySelectorAll('.rbtn'), function (x) {
+            x.classList.toggle('on', (parseInt(x.getAttribute('data-range'), 10) || 0) === rv);
+          });
+        }
+      }
+      var pd = /[?&]period=(day|week)/.exec(location.search);
+      if (pd) {
+        PERIOD = pd[1];
+        var pseg = $('periodSeg');
+        if (pseg) {
+          Array.prototype.forEach.call(pseg.querySelectorAll('.rbtn'), function (x) {
+            x.classList.toggle('on', (x.getAttribute('data-period') || 'day') === PERIOD);
+          });
+        }
+      }
     })();
 
     load();
