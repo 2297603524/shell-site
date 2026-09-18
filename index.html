@@ -97,23 +97,26 @@
     /* ===== 方形卡片墙 ===== */
     .wall {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+      /* min() 保证轨道永不宽于容器，避免被内容 min-content 撑破 */
+      grid-template-columns: repeat(auto-fill, minmax(min(248px, 100%), 1fr));
       gap: 14px;
       align-items: start;
     }
     .tile {
-      aspect-ratio: 1 / 1;
-      padding: 18px;
+      aspect-ratio: 1 / 1;          /* 首选正方形，装不下时自动撑高 */
+      min-height: 236px;
+      min-width: 0;
+      padding: 16px 18px;
       display: flex;
       flex-direction: column;
       position: relative;
-      overflow: hidden;
+      container-type: inline-size;
       transition: transform .22s ease, box-shadow .22s ease;
     }
     .tile:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(255,126,182,.26); }
 
-    .tile-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-    .tile-title { font-weight: 700; font-size: 14px; line-height: 1.35; }
+    .tile-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; flex: none; flex-wrap: wrap; }
+    .tile-title { font-weight: 700; font-size: 14px; line-height: 1.35; flex: 1; min-width: 0; }
     .tile-title .sub { display: block; color: var(--muted); font-weight: 400; font-size: 11px; margin-top: 2px; }
     .badge {
       font-size: 11px; padding: 3px 10px; border-radius: 999px;
@@ -123,20 +126,21 @@
     .b-orange { color: #d97706;     border-color: #fde68a; background: #fffbeb; }
     .b-green  { color: var(--down); border-color: #99f6e4; background: #f0fdfa; }
 
-    .tile-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; }
-    .vix-price { font-size: clamp(38px, 9vw, 52px); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+    /* flex:1 0 auto —— 空间不足时撑高卡片而不是压扁内容 */
+    .tile-mid { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; padding: 10px 0; }
+    .vix-price { font-size: clamp(36px, 8vw, 52px); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
     .vix-chg { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 6px; }
     .up   { color: var(--up); }    /* 涨：红（A股惯例） */
     .down { color: var(--down); }  /* 跌：绿 */
     .flat { color: var(--muted); }
 
-    .spark-link { display: block; text-decoration: none; margin: 8px 0 10px; }
-    .spark-link svg { width: 100%; height: 44px; display: block; }
-    .spark-link .cap { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; margin-top: 2px; }
+    .spark-link { display: block; text-decoration: none; margin: 6px 0 8px; flex: none; }
+    .spark-link svg { width: 100%; height: 40px; display: block; }
+    .spark-link .cap { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; margin-top: 2px; flex-wrap: wrap; }
     .spark-link:hover .cap { color: var(--ink); }
 
-    .tile-foot { border-top: 2px dashed var(--line); padding-top: 10px; }
-    .tile-time { color: var(--muted); font-size: 11px; margin-bottom: 8px; line-height: 1.5; }
+    .tile-foot { border-top: 2px dashed var(--line); padding-top: 9px; flex: none; }
+    .tile-time { color: var(--muted); font-size: 11px; margin-bottom: 7px; line-height: 1.45; }
     .tile-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .btn {
       border: 2px solid var(--line); background: #fff; color: var(--ink);
@@ -147,6 +151,34 @@
     .btn:disabled { opacity: .5; cursor: wait; }
     .btn.detail { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff; border-color: transparent; margin-left: auto; }
     .vix-err { color: #d97706; font-size: 10px; width: 100%; }
+
+    /* ===== 自适应：卡片越窄，排版越紧凑 ===== */
+    @container (max-width: 300px) {
+      .tile-title { font-size: 13px; }
+      .vix-price { font-size: 34px; }
+      .vix-chg { font-size: 14px; }
+      .spark-link svg { height: 32px; }
+      .spark-link .cap, .tile-time { font-size: 10px; }
+      .btn { padding: 4px 10px; font-size: 11px; }
+    }
+    @container (max-width: 252px) {
+      .tile-title .sub { display: none; }
+      .vix-price { font-size: 30px; }
+      .spark-link .cap { display: none; }
+      .tile-time { margin-bottom: 6px; }
+    }
+    /* 窄屏：取消正方形、单列铺开、整体收紧 */
+    @media (max-width: 480px) {
+      .tile { aspect-ratio: auto; min-height: 0; padding: 14px 16px; }
+      .wall { grid-template-columns: 1fr; }
+      main { padding: 12px 10px 32px; }
+      header { margin: 8px 8px 0; padding: 8px 14px; }
+      .logo { font-size: 14px; }
+      nav a { font-size: 12px; margin-left: 10px; }
+      .hero { min-height: 96px; }
+      .hero-card { padding: 10px 14px; max-width: 78%; }
+      .vix-price { font-size: 40px; }
+    }
 
     footer {
       position: relative; z-index: 1; text-align: center; padding: 16px;
@@ -178,7 +210,7 @@
       <!-- VIX 方形卡 -->
       <section class="card tile" aria-label="VIX 恐慌指数">
         <div class="tile-top">
-          <div class="tile-title">📈 VIX 恐慌指数<span class="sub">标普500 30天隐含波动率</span></div>
+          <div class="tile-title">📈 VIX 恐慌指数<span class="sub">30 天隐含波动率 · SPX</span></div>
           <span class="badge" id="vixLevel">观测中…</span>
         </div>
 
