@@ -531,12 +531,43 @@
   /* ===== VIX 详情 ===== */
   (function () {
     'use strict';
+    /* ===== iOS 式动效原语：数字滚动 + 折线描线 ===== */
+    function tweenNum(el, to, fmtFn) {
+      var from = parseFloat(String(el.textContent || '').replace(/,/g, ''));
+      if (!isFinite(from)) from = to;
+      if (from === to) { el.textContent = fmtFn(to); return; }
+      var t0 = performance.now(), dur = 420;
+      (function step(t) {
+        var k = Math.min(1, (t - t0) / dur);
+        var e = 1 - Math.pow(1 - k, 3);            /* easeOutCubic */
+        el.textContent = fmtFn(from + (to - from) * e);
+        if (k < 1) requestAnimationFrame(step);
+      })(t0);
+    }
+    function strokeReveal(path, dur) {
+      if (!path || !path.getTotalLength) return;
+      try {
+        var L = path.getTotalLength();
+        path.style.transition = 'none';
+        path.style.strokeDasharray = L + ' ' + L;
+        path.style.strokeDashoffset = L;
+        path.getBoundingClientRect();              /* 强制应用起点 */
+        path.style.transition = 'stroke-dashoffset ' + (dur || 900) + 'ms cubic-bezier(.4, 0, .2, 1)';
+        path.style.strokeDashoffset = '0';
+        setTimeout(function () {
+          path.style.transition = 'none';
+          path.style.strokeDasharray = 'none';
+        }, (dur || 900) + 80);
+      } catch (e) {}
+    }
+
     var REFRESH_SECONDS = 5;   // 全部数据每 5 秒刷新
     var left = 0, busy = false, hasData = false, backoff = false;
     var HIST = null, INTRA = null, MODE = 'day', RANGE = 60, liveDate = null, lastPlottedPrice = null;
     var lastLiveKey = '', lastHistKey = '';   // 数据指纹：未变化时跳过渲染
 
-    var $ = function (id) { return document.getElementById(id); };
+    var $ = function (id) { return document.getElementById(id);
+ };
     var elPrice = $('vixPrice'), elChg = $('vixChg'), elTime = $('vixTime'), elLevel = $('vixLevel'), elErr = $('vixErr'), elBtn = $('vixRefresh');
     var svg = $('chartSvg'), tip = $('chartTip'), wrap = $('chartWrap');
 
@@ -683,7 +714,7 @@
       });
       area += 'L' + f2(nx(pts.length - 1)) + ' ' + y1 + 'L' + f2(nx(0)) + ' ' + y1 + 'Z';
       s += '<path d="' + area + '" fill="url(#lgArea)"/>';
-      s += '<path d="' + line + '" fill="none" stroke="url(#lgLine)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>';
+      s += '<path id="vixLine" d="' + line + '" fill="none" stroke="url(#lgLine)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>';
 
       // x 轴标签（首/中/尾）：首尾用 start/end 对齐，避免贴边被裁
       var crossYear = pts[0][0].slice(0, 4) !== pts[pts.length - 1][0].slice(0, 4);
@@ -704,6 +735,7 @@
       s += '<circle id="hoverDot" r="5" fill="#fff" stroke="#ff7eb6" stroke-width="2.4" opacity="0"/>';
 
       svg.innerHTML = s;
+      strokeReveal(document.getElementById('vixLine'), 950);
 
       // 记录映射供 hover 使用
       svg._map = { pts: pts, nx: nx, ny: ny, x0: x0, x1: x1, W: W, H: H };
@@ -864,7 +896,7 @@
 
       var dirCls = chg > 0 ? 'up' : (chg < 0 ? 'down' : 'flat');
       setCls(elPrice, dirCls);
-      elPrice.textContent = f2(price);
+      tweenNum(elPrice, price, function (v) { return f2(v); });
       var sign = chg > 0 ? '+' : '';
       if (chg === 0 && pct === 0) { elChg.textContent = '0.00 (0.00%)'; setCls(elChg, 'flat'); }
       else { elChg.textContent = sign + f2(chg) + ' (' + sign + f2(pct) + '%)'; setCls(elChg, dirCls); }

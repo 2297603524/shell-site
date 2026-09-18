@@ -461,7 +461,38 @@
   /* ===== 主逻辑 ===== */
   (function () {
     'use strict';
-    var $ = function (id) { return document.getElementById(id); };
+    /* ===== iOS 式动效原语：数字滚动 + 折线描线 ===== */
+    function tweenNum(el, to, fmtFn) {
+      var from = parseFloat(String(el.textContent || '').replace(/,/g, ''));
+      if (!isFinite(from)) from = to;
+      if (from === to) { el.textContent = fmtFn(to); return; }
+      var t0 = performance.now(), dur = 420;
+      (function step(t) {
+        var k = Math.min(1, (t - t0) / dur);
+        var e = 1 - Math.pow(1 - k, 3);            /* easeOutCubic */
+        el.textContent = fmtFn(from + (to - from) * e);
+        if (k < 1) requestAnimationFrame(step);
+      })(t0);
+    }
+    function strokeReveal(path, dur) {
+      if (!path || !path.getTotalLength) return;
+      try {
+        var L = path.getTotalLength();
+        path.style.transition = 'none';
+        path.style.strokeDasharray = L + ' ' + L;
+        path.style.strokeDashoffset = L;
+        path.getBoundingClientRect();              /* 强制应用起点 */
+        path.style.transition = 'stroke-dashoffset ' + (dur || 900) + 'ms cubic-bezier(.4, 0, .2, 1)';
+        path.style.strokeDashoffset = '0';
+        setTimeout(function () {
+          path.style.transition = 'none';
+          path.style.strokeDasharray = 'none';
+        }, (dur || 900) + 80);
+      } catch (e) {}
+    }
+
+    var $ = function (id) { return document.getElementById(id);
+ };
     var DATA = null, CUR = 0, WEIGHTS = {}, lastFngKey = '';   // 数据指纹
     var PART_NAMES = {
       momentum: '价格动量', trend: '短期趋势', breadth: '均线广度',
@@ -491,7 +522,7 @@
       var s = parseFloat(it.score);
       var c = fgCls(s);
 
-      $('curScore').textContent = f1(s);
+      tweenNum($('curScore'), s, function (v) { return f1(v); });
       $('curScore').className = 'price-big fg-c' + c;
       $('curRating').textContent = it.rating_cn || '--';
       $('curRating').className = 'badge bg-c' + c;
@@ -679,7 +710,7 @@
       });
       area += 'L' + nx(p.length - 1).toFixed(1) + ' ' + y1 + 'L' + nx(0).toFixed(1) + ' ' + y1 + 'Z';
       s += '<path d="' + area + '" fill="url(#fngA)"/>';
-      s += '<path d="' + line + '" fill="none" stroke="url(#fngL)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>';
+      s += '<path id="fngLine" d="' + line + '" fill="none" stroke="url(#fngL)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>';
 
       var xIdx = [];
       [0, Math.floor((p.length - 1) / 2), p.length - 1].forEach(function (i) {
@@ -698,6 +729,7 @@
       svg.innerHTML = s;
 
       svg._map = { pts: p, nx: nx, ny: ny, x0: x0, x1: x1, W: W, H: H };
+      strokeReveal(document.getElementById('fngLine'), 950);
 
       var it = DATA.indices[CUR];
       var full = it.fullDays ? '，全史 ' + it.fullDays + ' 个交易日' : '';

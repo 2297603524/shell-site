@@ -559,11 +559,42 @@
   /* ===== 看板数据：单文件 summary.json（约 2KB），全部数据每 5 秒刷新 ===== */
   (function () {
     'use strict';
+    /* ===== iOS 式动效原语：数字滚动 + 折线描线 ===== */
+    function tweenNum(el, to, fmtFn) {
+      var from = parseFloat(String(el.textContent || '').replace(/,/g, ''));
+      if (!isFinite(from)) from = to;
+      if (from === to) { el.textContent = fmtFn(to); return; }
+      var t0 = performance.now(), dur = 420;
+      (function step(t) {
+        var k = Math.min(1, (t - t0) / dur);
+        var e = 1 - Math.pow(1 - k, 3);            /* easeOutCubic */
+        el.textContent = fmtFn(from + (to - from) * e);
+        if (k < 1) requestAnimationFrame(step);
+      })(t0);
+    }
+    function strokeReveal(path, dur) {
+      if (!path || !path.getTotalLength) return;
+      try {
+        var L = path.getTotalLength();
+        path.style.transition = 'none';
+        path.style.strokeDasharray = L + ' ' + L;
+        path.style.strokeDashoffset = L;
+        path.getBoundingClientRect();              /* 强制应用起点 */
+        path.style.transition = 'stroke-dashoffset ' + (dur || 900) + 'ms cubic-bezier(.4, 0, .2, 1)';
+        path.style.strokeDashoffset = '0';
+        setTimeout(function () {
+          path.style.transition = 'none';
+          path.style.strokeDasharray = 'none';
+        }, (dur || 900) + 80);
+      } catch (e) {}
+    }
+
     var REFRESH_MS = 5000;
     var busy = false, hasData = false, backoff = false;
     var lastPayload = '';        // 上一份数据指纹：完全相同时跳过渲染，避免无谓重绘
 
-    var $ = function (id) { return document.getElementById(id); };
+    var $ = function (id) { return document.getElementById(id);
+ };
     var elVixPrice = $('vixPrice'), elVixChg = $('vixChg'), elVixTime = $('vixTime'),
         elVixLevel = $('vixLevel'), elVixErr = $('vixErr'), elVixBtn = $('vixRefresh'),
         elFgScore = $('fgScore'), elFgDelta = $('fgDelta'), elFgLevel = $('fgLevel'),
@@ -614,6 +645,7 @@
         '<stop offset="100%" stop-color="#c4b5fd" stop-opacity="0.03"/></linearGradient></defs>' +
         '<path d="' + area + '" fill="url(#' + uid + 'A)"/>' +
         '<path d="' + line + '" fill="none" stroke="url(#' + uid + 'L)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>';
+      strokeReveal(svgEl.querySelectorAll('path')[1], 900);
       if (labelEl) {
         labelEl.textContent = '近 30 日走势（' + pts[0][0].slice(5) + ' ~ ' + pts[pts.length - 1][0].slice(5) + '）';
       }
@@ -633,7 +665,7 @@
 
       var dirCls = chg > 0 ? 'up' : (chg < 0 ? 'down' : 'flat');
       setCls(elVixPrice, dirCls);
-      elVixPrice.textContent = f2(price, 2);
+      tweenNum(elVixPrice, price, function (v) { return f2(v, 2); });
       if (chg === 0 && pct === 0) {
         elVixChg.textContent = '0.00 (0.00%)';
         setCls(elVixChg, 'flat');
@@ -655,7 +687,7 @@
       if (lastFg !== null && lastFg !== s && window.__flash) window.__flash(elFgScore);
       lastFg = s;
       var c = fgCls(s);
-      elFgScore.textContent = s.toFixed(1);
+      tweenNum(elFgScore, s, function (v) { return v.toFixed(1); });
       elFgScore.className = 'vix-price fg-c' + c;
       elFgLevel.textContent = d.rating_cn || '--';
       elFgLevel.className = 'badge bg-c' + c;
