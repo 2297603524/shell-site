@@ -71,21 +71,6 @@
       display: flex; align-items: center;
       margin-bottom: 14px;
     }
-    .hero-card {
-      margin-left: clamp(14px, 4vw, 34px);
-      max-width: 400px;
-      background: var(--panel);
-      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-      border: 2px solid rgba(255,255,255,.9); border-radius: 14px;
-      padding: 12px 18px; box-shadow: var(--shadow);
-    }
-    .hero-card h1 {
-      font-size: clamp(19px, 2.6vw, 24px); margin-bottom: 4px;
-      background: linear-gradient(90deg, var(--accent), var(--accent2));
-      -webkit-background-clip: text; background-clip: text; color: transparent;
-    }
-    .hero-card p { color: var(--muted); font-size: 12px; line-height: 1.7; }
-
     /* ===== 卡片通用 ===== */
     .card {
       background: var(--panel);
@@ -176,16 +161,7 @@
       .logo { font-size: 14px; }
       nav a { font-size: 12px; margin-left: 10px; }
       .hero { min-height: 96px; }
-      .hero-card { padding: 10px 14px; max-width: 78%; }
       .vix-price { font-size: 40px; }
-    }
-
-    footer {
-      position: relative; z-index: 1; text-align: center; padding: 16px;
-      color: var(--muted); font-size: 12px;
-      background: var(--panel);
-      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-      border-top: 2px solid var(--line);
     }
   </style>
 </head>
@@ -199,12 +175,7 @@
   </header>
 
   <main>
-    <section class="hero">
-      <div class="hero-card">
-        <h1>市场情绪看板</h1>
-        <p>VIX 实时观测 · CBOE 官方数据 · 每秒自动刷新 ♪</p>
-      </div>
-    </section>
+    <section class="hero" aria-hidden="true"></section>
 
     <div class="wall">
       <!-- VIX 方形卡 -->
@@ -239,10 +210,6 @@
       <!-- 后续指标卡直接往这里加，会自动铺成方格墙 -->
     </div>
   </main>
-
-  <footer>
-    © 2026 SAKURA SHELL · 市场情绪看板 · 数据源 CBOE 官方 · 延迟行情仅供参考 (´▽`)ﾉ
-  </footer>
 
   <script>
   /* ===== 樱花飘落 ===== */
@@ -310,7 +277,7 @@
         elChg.textContent = sign + f2(chg, 2) + ' (' + sign + f2(pct, 2) + '%)';
         setCls(elChg, dirCls);
       }
-      elTime.textContent = '最后成交：' + fmtTime(d.last_trade_time) + '（美东）';
+      elTime.textContent = '最后成交：' + fmtTime(d.last_trade_time) + '（美东）· CBOE 官方延迟行情';
       var info = levelInfo(price);
       elLevel.textContent = info[0];
       elLevel.className = 'badge ' + info[1];
