@@ -30,11 +30,15 @@ jobs:
           curl -sf --max-time 60 "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv" -o /tmp/vixhist.csv || { echo "history fetch failed"; exit 0; }
           python3 .github/scripts/build_vix_history.py /tmp/vixhist.csv data/vix-history.json
 
+      - name: Fetch multi-index snapshot and build data/indices.json
+        run: |
+          python3 .github/scripts/build_indices.py data/indices.json
+
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/vix.json data/vix-history.json
+          git add data/vix.json data/vix-history.json data/indices.json
           if git diff --cached --quiet; then
             echo "数据无变化，跳过提交"
           else
