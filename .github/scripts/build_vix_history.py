@@ -17,7 +17,7 @@ import csv
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 
 RECENT = 120
 
@@ -53,7 +53,8 @@ def main() -> None:
     lo_d, lo_v = min(recent, key=lambda p: p[1])
 
     out = {
-        "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        # 不写入抓取时间戳：历史为日频数据，只有真正新增交易日时才应产生提交，
+        # 否则每 5 分钟一次的 cron 会产出大量无意义 commit
         "count": len(points),
         "start": points[0][0],
         "end": points[-1][0],

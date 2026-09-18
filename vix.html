@@ -473,7 +473,7 @@
       var pct = Math.round(vs.filter(function (v) { return v <= cur; }).length / vs.length * 100);
 
       $('statUpdated').textContent = '（' + pts[0][0] + ' ~ ' + pts[pts.length - 1][0]
-        + '，共 ' + pts.length + ' 个交易日 · 数据更新 ' + (HIST.updated || '--') + '）';
+        + '，共 ' + pts.length + ' 个交易日）';
       $('statHigh').textContent = f2(mx);
       $('statHighD').textContent = pts[hiIdx][0];
       $('statLow').textContent = f2(mn);
