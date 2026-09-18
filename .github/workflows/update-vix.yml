@@ -1,0 +1,38 @@
+name: update-vix
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # 每 5 分钟抓一次 CBOE 官方延迟行情
+  workflow_dispatch:          # 支持手动触发
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-vix
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch CBOE VIX and write data/vix.json
+        run: |
+          curl -sf --max-time 30 "https://cdn.cboe.com/api/global/delayed_quotes/quotes/_VIX.json" -o /tmp/vix.json || { echo "CBOE fetch failed"; exit 0; }
+          mkdir -p data
+          jq '{price: .data.current_price, change: .data.price_change, change_percent: .data.price_change_percent, open: .data.open, high: .data.high, low: .data.low, prev_close: .data.prev_day_close, last_trade_time: .data.last_trade_time, fetched_at: .timestamp, source: "CBOE"}' /tmp/vix.json > data/vix.json
+          cat data/vix.json
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/vix.json
+          if git diff --cached --quiet; then
+            echo "数据无变化，跳过提交"
+          else
+            git commit -m "chore: 更新 VIX 数据 [skip ci]"
+            git push
+          fi

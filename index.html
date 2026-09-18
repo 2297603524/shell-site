@@ -189,8 +189,7 @@
           </span>
         </div>
         <div class="vix-note">
-          数据源：腾讯财经 qt.gtimg.cn（免密钥、浏览器直连），页面打开期间每 1 秒自动拉取一次最新行情；
-          若数据源限流导致拉取失败，会自动退避至 10 秒后重试。
+          数据源：CBOE 官方（芝加哥期权交易所，VIX 发布方）。GitHub Actions 每 5 分钟自动抓取一次写入本站 data/vix.json，页面每 1 秒读取最新入库数据（若抓取失败自动退避至 10 秒重试）。
           VIX 高于 30 通常代表市场恐慌情绪升温，低于 15 代表情绪平静；涨跌配色遵循 A 股惯例（涨红跌绿）。
         </div>
       </div>
@@ -264,7 +263,7 @@
         setCls(elChg, dirCls);
       }
 
-      elTime.textContent = '数据时间：' + (time || '--') + '（美东）';
+      elTime.textContent = '最后成交：' + (time || '--') + '（美东）· CBOE 官方';
 
       var info = levelInfo(price);
       elLevel.textContent = info[0];
@@ -278,22 +277,23 @@
       var backoff = false;
       elBtn.disabled = true;
       elBtn.textContent = '刷新中…';
-      // 加时间戳防缓存，确保每次拿到最新行情
-      fetch('https://qt.gtimg.cn/q=usVIX&r=' + Date.now(), { cache: 'no-store' })
-        .then(function (res) { return res.arrayBuffer(); })
-        .then(function (buf) { return new TextDecoder('gbk').decode(buf); })
-        .then(function (text) {
-          var m = text.match(/v_usVIX="([^"]*)"/);
-          if (!m || !m[1]) throw new Error('empty payload');
-          var f = m[1].split('~');
-          var price = parseFloat(f[3]);
-          var prev = parseFloat(f[4]);
-          var chg = parseFloat(f[5]);
-          var pct = parseFloat(f[6]);
+      // 数据由 GitHub Actions 每 5 分钟从 CBOE 官方抓取到 data/vix.json，
+      // 页面同域读取（无跨域问题），加时间戳防 CDN 缓存
+      fetch('./data/vix.json?r=' + Date.now(), { cache: 'no-store' })
+        .then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(function (d) {
+          var price = parseFloat(d.price);
+          var prev = parseFloat(d.prev_close);
+          var chg = parseFloat(d.change);
+          var pct = parseFloat(d.change_percent);
           if (!isFinite(price) || !isFinite(prev)) throw new Error('bad fields');
           if (!isFinite(chg)) chg = price - prev;
           if (!isFinite(pct)) pct = prev ? (chg / prev) * 100 : 0;
-          render(price, chg, pct, f[30]);
+          var t = (d.last_trade_time || '').replace('T', ' ');
+          render(price, chg, pct, t);
           elErr.textContent = '';
         })
         .catch(function () {
