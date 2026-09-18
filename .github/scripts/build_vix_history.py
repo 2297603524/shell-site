@@ -1,64 +1,73 @@
 #!/usr/bin/env python3
-"""从 CBOE VIX_History.csv 生成站点用的完整历史数据 JSON（自 1990-01-02 指数发布起）。
+"""从 CBOE 官方 JSON 接口生成站点用的 VIX 全量日线数据（自 1990-01-02 起）。
+
+数据源:
+    https://cdn.cboe.com/api/global/delayed_quotes/charts/historical/_VIX.json
+    （全量 OHLC，比 VIX_History.csv 更易解析；字段为字符串）
 
 用法:
-    python build_vix_history.py [csv路径] [输出json路径]
+    python build_vix_history.py [输出json路径]   默认 data/vix-history.json
 
-默认: /tmp/vixhist.csv -> data/vix-history.json
-
-输出结构（紧凑，控体积）:
+输出结构:
     {
-      "updated": "...", "count": 9276, "start": "1990-01-02", "end": "2026-09-17",
-      "points": [["1990-01-02", 17.24], ...],       # 全量 [日期, 收盘]
-      "stats": { ... 最近 120 日统计（兼容旧前端） }
+      "count": 9276, "start": "1990-01-02", "end": "2026-09-17",
+      "source": "CBOE charts/historical",
+      "points": [["1990-01-02", 17.24, 17.24, 17.24, 17.24], ...],   # [日期, 收, 开, 高, 低]
+      "stats": { ... 最近 120 日统计 }
     }
+    不写抓取时间戳：只有真正新增交易日时才产生文件差异
 """
 import csv
 import json
 import os
 import sys
-from datetime import datetime
+import urllib.request
 
+URL = "https://cdn.cboe.com/api/global/delayed_quotes/charts/historical/_VIX.json"
 RECENT = 120
 
 
+def fetch(url: str) -> dict:
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (site-data-bot)"})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.load(resp)
+
+
+def num(v) -> float:
+    try:
+        return round(float(v), 2)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def main() -> None:
-    src = sys.argv[1] if len(sys.argv) > 1 else "/tmp/vixhist.csv"
-    dst = sys.argv[2] if len(sys.argv) > 2 else "data/vix-history.json"
+    dst = sys.argv[1] if len(sys.argv) > 1 else "data/vix-history.json"
+    raw = fetch(URL)
+    rows = raw.get("data") or []
 
-    rows = []
-    with open(src, newline="", encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            try:
-                d = datetime.strptime(row["DATE"].strip(), "%m/%d/%Y").strftime("%Y-%m-%d")
-                rows.append([d, round(float(row["CLOSE"]), 2)])
-            except (ValueError, KeyError, TypeError):
-                continue
+    dedup = {}
+    for r in rows:
+        d = r.get("date")
+        if not d:
+            continue
+        dedup[d] = [d, num(r.get("close")), num(r.get("open")), num(r.get("high")), num(r.get("low"))]
 
-    if not rows:
-        print("no valid rows, abort")
+    if not dedup:
+        print("no valid rows from CBOE, keep old file")
         sys.exit(1)
 
-    # 去重 + 排序（同一日期只留一条）
-    dedup = {}
-    for d, c in rows:
-        dedup[d] = c
-    points = sorted(dedup.items())
-
-    recent = points[-RECENT:]
-    closes = [c for _, c in recent]
+    points = [dedup[k] for k in sorted(dedup)]
+    closes = [p[1] for p in points[-RECENT:]]
     cur = closes[-1]
-    hi_d, hi_v = max(recent, key=lambda p: p[1])
-    lo_d, lo_v = min(recent, key=lambda p: p[1])
+    recent = points[-RECENT:]
+    hi_d, hi_v = max(((p[0], p[1]) for p in recent), key=lambda x: x[1])
+    lo_d, lo_v = min(((p[0], p[1]) for p in recent), key=lambda x: x[1])
 
     out = {
-        # 不写入抓取时间戳：历史为日频数据，只有真正新增交易日时才应产生提交，
-        # 否则每 5 分钟一次的 cron 会产出大量无意义 commit
         "count": len(points),
         "start": points[0][0],
         "end": points[-1][0],
-        "source": "CBOE VIX_History.csv",
+        "source": "CBOE charts/historical",
         "points": points,
         "stats": {
             "current": cur,

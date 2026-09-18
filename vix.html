@@ -107,6 +107,12 @@
 
     /* ===== 图表 ===== */
     .range-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+    .ctrl-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; flex-wrap: wrap; margin-bottom: 12px;
+    }
+    .seg { display: flex; gap: 8px; flex-wrap: wrap; }
+    .seg .rbtn { min-width: 58px; }
     .rbtn {
       border: 2px solid var(--line); background: #fff; color: var(--muted);
       border-radius: 999px; padding: 5px 14px; font-size: 12px; font-weight: 700;
@@ -210,9 +216,16 @@
     <!-- 走势图 -->
     <section class="card">
       <div class="card-title">
-        📈 收盘走势
+        📈 走势图
         <span class="sub" id="chartSub">加载中…</span>
-        <span class="range-btns">
+      </div>
+      <div class="ctrl-row">
+        <span class="seg">
+          <button class="rbtn on" data-mode="day" type="button">日线</button>
+          <button class="rbtn" data-mode="week" type="button">周线</button>
+          <button class="rbtn" data-mode="min" type="button">分时</button>
+        </span>
+        <span class="range-btns" id="rangeBtns">
           <button class="rbtn" data-days="30" type="button">30日</button>
           <button class="rbtn on" data-days="60" type="button">60日</button>
           <button class="rbtn" data-days="120" type="button">120日</button>
@@ -298,7 +311,7 @@
     'use strict';
     var REFRESH_SECONDS = 1;
     var left = 0, busy = false, hasData = false, backoff = false;
-    var HIST = null, RANGE = 60, liveDate = null, lastPlottedPrice = null;
+    var HIST = null, INTRA = null, MODE = 'day', RANGE = 60, liveDate = null, lastPlottedPrice = null;
 
     var $ = function (id) { return document.getElementById(id); };
     var elPrice = $('vixPrice'), elChg = $('vixChg'), elTime = $('vixTime'), elLevel = $('vixLevel'), elErr = $('vixErr'), elBtn = $('vixRefresh');
@@ -320,10 +333,57 @@
 
     var MAXP = 1400;  // 绘图抽样上限，全量视图下保持流畅
 
+    /* ---------- 周期聚合与取数 ---------- */
+    function weekKey(dateStr) {
+      // 用该周周四的日期作为 ISO 周键
+      var d = new Date(dateStr + 'T00:00:00Z');
+      var day = (d.getUTCDay() + 6) % 7;              // 周一 = 0
+      d.setUTCDate(d.getUTCDate() - day + 3);
+      return d.toISOString().slice(0, 10);
+    }
+
+    // 日线 [d,c,o,h,l] → 周线（日期取该周最后交易日，开=首日开，高/低=周内极值）
+    function toWeekly(pts) {
+      var out = [], curKey = null, cur = null;
+      pts.forEach(function (p) {
+        var k = weekKey(p[0]);
+        if (k !== curKey) {
+          if (cur) out.push(cur);
+          curKey = k;
+          cur = [p[0], p[1], p[2] || p[1], p[3] || p[1], p[4] || p[1]];
+        } else {
+          cur[0] = p[0];
+          cur[1] = p[1];
+          if (p[3]) cur[3] = Math.max(cur[3], p[3]);
+          if (p[4]) cur[4] = Math.min(cur[4], p[4]);
+        }
+      });
+      if (cur) out.push(cur);
+      return out;
+    }
+
+    function intraSession() {
+      if (!INTRA || !INTRA.sessions || !INTRA.sessions.length) return null;
+      return INTRA.sessions[INTRA.sessions.length - 1];
+    }
+
     function plotPoints() {
+      // ---- 分时 ----
+      if (MODE === 'min') {
+        var ses = intraSession();
+        if (!ses) return [];
+        var mpts = ses.points.map(function (p) { return [p[0], p[1]]; });   // [HH:MM, price]
+        // 同一交易日且已有实时价：用实时价顶掉最后一个点（盘中跳动）
+        if (liveDate === ses.date && lastPlottedPrice !== null && mpts.length) {
+          mpts[mpts.length - 1] = [mpts[mpts.length - 1][0], lastPlottedPrice, true];
+        }
+        return mpts;
+      }
+      // ---- 日线 / 周线 ----
       if (!HIST || !HIST.points || !HIST.points.length) return [];
-      var all = HIST.points;   // [["YYYY-MM-DD", close], ...]
-      var pts = (RANGE > 0 && RANGE < all.length) ? all.slice(-RANGE) : all.slice();
+      var all = HIST.points;   // [["YYYY-MM-DD", close, open, high, low], ...]
+      var base = (RANGE > 0 && RANGE < all.length) ? all.slice(-RANGE) : all.slice();
+      var pts = (MODE === 'week') ? toWeekly(base) : base;
       // 点太多时等距抽样（始终保留首尾）
       if (pts.length > MAXP) {
         var k = Math.ceil(pts.length / MAXP), s = [];
@@ -389,12 +449,13 @@
       s += '<path d="' + area + '" fill="url(#lgArea)"/>';
       s += '<path d="' + line + '" fill="none" stroke="url(#lgLine)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>';
 
-      // x 轴日期（首/中/尾）：跨度跨年时显示年份，否则显示月-日
+      // x 轴标签（首/中/尾）：分时显示时刻；日期型跨年显示年-月，年内显示月-日
       var crossYear = pts[0][0].slice(0, 4) !== pts[pts.length - 1][0].slice(0, 4);
       [0, Math.floor((pts.length - 1) / 2), pts.length - 1].forEach(function (i) {
         if (i < 0) return;
         var x = nx(i);
-        var label = crossYear ? pts[i][0].slice(0, 7) : pts[i][0].slice(5);
+        var label = (MODE === 'min') ? pts[i][0]
+                  : (crossYear ? pts[i][0].slice(0, 7) : pts[i][0].slice(5));
         s += '<text x="' + x + '" y="' + (H - 12) + '" text-anchor="middle" font-size="11" fill="#b8a6c4">' + label + '</text>';
       });
 
@@ -407,10 +468,17 @@
       // 记录映射供 hover 使用
       svg._map = { pts: pts, nx: nx, ny: ny, x0: x0, x1: x1 };
 
-      var rawN = (RANGE > 0 && RANGE < HIST.points.length) ? RANGE : HIST.points.length;
-      var first = pts[0][0], last = pts[pts.length - 1][0];
-      var sub = '（' + first + ' ~ ' + last + '，共 ' + rawN + ' 个交易日';
-      sub += (pts.length < rawN ? '，抽样绘制 ' + pts.length + ' 点' : '') + '）';
+      var sub;
+      if (MODE === 'min') {
+        var ses = intraSession();
+        sub = '（' + (ses ? ses.date : '--') + ' 分时 · 美东时间，' + pts.length + ' 个分钟点）';
+      } else if (MODE === 'week') {
+        sub = '（' + pts[0][0] + ' ~ ' + pts[pts.length - 1][0] + ' · 周线，共 ' + pts.length + ' 周）';
+      } else {
+        var rawN = (RANGE > 0 && RANGE < HIST.points.length) ? RANGE : HIST.points.length;
+        sub = '（' + pts[0][0] + ' ~ ' + pts[pts.length - 1][0] + ' · 日线，共 ' + rawN + ' 个交易日';
+        sub += (pts.length < rawN ? '，抽样绘制 ' + pts.length + ' 点' : '') + '）';
+      }
       $('chartSub').textContent = sub;
       return pts;
     }
@@ -432,7 +500,16 @@
       // tooltip 定位（换算成容器内像素）
       var leftPx = x / W * rect.width;
       var topPx = y / H * rect.height;
-      tip.textContent = p[0] + '　' + f2(p[1]) + (p[2] ? '（实时）' : '');
+      var txt;
+      if (MODE === 'min') {
+        var ses2 = intraSession();
+        txt = (ses2 ? ses2.date + ' ' : '') + p[0] + '　' + f2(p[1]) + (p[2] ? '（实时）' : '');
+      } else if (MODE === 'week') {
+        txt = p[0] + ' 当周　收 ' + f2(p[1]) + '　高 ' + f2(p[3]) + '　低 ' + f2(p[4]);
+      } else {
+        txt = p[0] + '　收 ' + f2(p[1]) + '　开 ' + f2(p[2]) + '　高 ' + f2(p[3]) + '　低 ' + f2(p[4]);
+      }
+      tip.textContent = txt;
       tip.style.left = leftPx + 'px';
       tip.style.top = topPx + 'px';
       tip.classList.add('on');
@@ -458,6 +535,26 @@
         renderStats(RANGE);
       });
     });
+
+    // 周期切换：日线 / 周线 / 分时
+    document.querySelectorAll('.rbtn[data-mode]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('.rbtn[data-mode]').forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        MODE = b.getAttribute('data-mode');
+        var rb = document.getElementById('rangeBtns');
+        if (rb) rb.style.display = (MODE === 'min') ? 'none' : '';   // 分时不需要区间按钮
+        hideHover();
+        drawChart();
+      });
+    });
+
+    function loadIntra() {
+      fetch('./data/vix-intraday.json?r=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (d) { INTRA = d; if (MODE === 'min') drawChart(); })
+        .catch(function () {});
+    }
 
     /* ---------- 统计 ---------- */
     function renderStats(days) {
@@ -561,13 +658,19 @@
       if (left <= 0) { loadLive(); }
     }, 1000);
 
-    // 历史数据为日频，每 60 秒重取一次即可
+    // 历史（日线）为日频、分时盘中每 5 分钟更新：都按 60 秒重取即可
     setInterval(loadHist, 60000);
+    setInterval(loadIntra, 60000);
 
-    elBtn.addEventListener('click', function () { loadLive(); loadHist(); });
+    elBtn.addEventListener('click', function () { loadLive(); loadHist(); loadIntra(); });
 
-    // 支持 URL 直达区间，如 vix.html?days=0（全部）/ ?days=1260（5年）
-    (function initRangeFromUrl() {
+    // 支持 URL 直达：?days=0（全部区间）/ ?mode=week|min（日线/周线/分时）
+    (function initFromUrl() {
+      var md = /[?&]mode=(\w+)/.exec(location.search);
+      if (md) {
+        var mb = document.querySelector('.rbtn[data-mode="' + md[1] + '"]');
+        if (mb) mb.click();
+      }
       var m = /[?&]days=(\d+)/.exec(location.search);
       if (!m) return;
       var d = parseInt(m[1], 10);
@@ -579,6 +682,7 @@
 
     loadLive();
     loadHist();
+    loadIntra();
   })();
   </script>
 </body>
