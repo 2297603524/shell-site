@@ -342,9 +342,13 @@
       }
     }
 
+    /* 无障碍：只关闭「大幅度位移动画」，保留颜色/透明度/按压等轻量反馈
+       （旧写法用 * { transition-duration:.01ms } 会把整站过渡全部干掉） */
     @media (prefers-reduced-motion: reduce) {
-      .tile, header, .hero, .card { animation: none !important; }
-      * { transition-duration: .01ms !important; }
+      .tile, header, .hero, .card, .sakura { animation: none !important; }
+      ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
+      .btn, .rbtn, .back { transition-duration: .14s !important; }
+      .vix-price, .vix-chg, .price-big, .price-chg { transition-duration: .14s !important; }
     }
 
     /* ===== 跨页面转场动画（View Transitions API，Chromium 111+）=====
@@ -369,6 +373,23 @@
 
     @media (prefers-reduced-motion: reduce) {
       ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+    }
+
+    /* ===== 移动端性能包（帧率优先）===== */
+    @media (max-width: 820px), (pointer: coarse) {
+      /* 背景层改为随内容滚动：省掉滚动时每帧重绘固定大背景的合成开销 */
+      body::before { position: absolute; inset: 0; height: 100%; min-height: 100vh; }
+      /* 樱花：去掉合成层提示 + 拉长周期（同样的视觉，帧率压力更低） */
+      .sakura { will-change: auto; animation-duration: calc(var(--dur, 14s) * 1.35); }
+      /* 入场动画更短更轻 */
+      .tile { animation-duration: .34s; }
+      /* 关闭容器的布局隔离（container-type 会带来额外布局开销） */
+      .tile { container-type: normal; }
+    }
+
+    /* 手机端用小尺寸 banner（省 ~160KB 传输与解码） */
+    @media (max-width: 640px) {
+      .hero { background-image: url("./img/banner-sm.webp"); }
     }
   </style>
 </head>
@@ -545,6 +566,7 @@
     'use strict';
     var REFRESH_MS = 5000;
     var busy = false, hasData = false, backoff = false;
+    var lastPayload = '';        // 上一份数据指纹：完全相同时跳过渲染，避免无谓重绘
 
     var $ = function (id) { return document.getElementById(id); };
     var elVixPrice = $('vixPrice'), elVixChg = $('vixChg'), elVixTime = $('vixTime'),
@@ -662,8 +684,12 @@
       fetch('./data/summary.json?r=' + Date.now(), { cache: 'no-store' })
         .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(function (d) {
-          if (d.vix) renderVix(d.vix);
-          if (d.fng) renderFng(d.fng);
+          var key = JSON.stringify(d);
+          if (key !== lastPayload) {          // 数据有变化才动 DOM
+            lastPayload = key;
+            if (d.vix) renderVix(d.vix);
+            if (d.fng) renderFng(d.fng);
+          }
           elVixErr.textContent = '';
           elFgErr.textContent = '';
           hasData = true;
@@ -703,6 +729,18 @@
       void el.offsetWidth;          // 重排以重启动画
       el.classList.add('flash');
     };
+  })();
+
+  /* ===== 页面转场：浏览器不支持 View Transitions 时用淡入模拟（老设备/其它内核也能有转场感） ===== */
+  (function () {
+    var root = document.documentElement;
+    if ('startViewTransition' in document) return;      // 原生支持，交给 CSS
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    root.style.opacity = '0';
+    root.style.transition = 'opacity .30s cubic-bezier(.4, 0, .2, 1)';
+    var show = function () { root.style.opacity = '1'; };
+    if (document.readyState === 'complete') { requestAnimationFrame(show); }
+    else { window.addEventListener('load', function () { requestAnimationFrame(show); }, { once: true }); }
   })();
 </script>
 </body>
