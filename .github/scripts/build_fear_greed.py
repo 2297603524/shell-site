@@ -5,14 +5,15 @@
     指数日K:  东财 push2his.eastmoney.com  →  腾讯 web.ifzq.gtimg.cn（兜底）
     融资余额: 东财 datacenter RPTA_RZRQ_LSHJ（沪深两市合计，每日）
 
-模型（7 个分项；价格类分项对每个指数独立计算，市场类分项全市场共享）:
+模型（8 个分项；价格类分项对每个指数独立计算，市场类分项全市场共享）:
     1. 价格动量   收盘 vs MA125 偏离度            → 越高越贪婪
     2. 短期趋势   近 20 日涨跌幅                  → 越高越贪婪
     3. 均线广度   近 20 日"收盘>MA20"的天数占比    → 越高越贪婪
     4. 波动率     20 日年化波动率（反向分位）      → 波动越大越恐惧
     5. 量能热度   成交量 vs MA60 偏离度            → 越高越贪婪
-    6. 杠杆情绪   全市场融资余额 vs MA20 偏离度     → 加杠杆越猛越贪婪  ★
+    6. 融资热度   全市场融资买入额 vs MA20 偏离度   → 加杠杆越猛越贪婪  ★流量指标，比余额更敏感
     7. 风险偏好   中证1000 与沪深300 近 60 日相对强弱 → 小盘越强越贪婪  ★
+    8. 回撤深度   收盘距近 250 交易日高点           → 越接近新高越贪婪  ★各指数特异
 
 每个分项取近 WINDOW(750 ≈ 3 年) 个交易日的滚动分位（0~100），等权平均。
 
@@ -118,7 +119,7 @@ def get_kline(label: str, em_id: str, tx_code: str):
 
 
 def fetch_margin():
-    """全市场融资余额（沪深合计）→ {date: 融资余额}"""
+    """全市场融资买入额（流量指标，比余额更敏感）→ {date: 融资买入额}"""
     out = {}
     for page in (1, 2, 3):
         try:
@@ -131,11 +132,11 @@ def fetch_margin():
             break
         for r in rows:
             d = str(r.get("DIM_DATE") or "")[:10]
-            v = r.get("RZYE")
+            v = r.get("RZMRE") or r.get("RZYE")     # 优先融资买入额，缺失回退余额
             if d and v:
                 out[d] = float(v)
         time.sleep(0.6)
-    print("   融资余额历史: %d 条" % len(out))
+    print("   融资数据历史: %d 条" % len(out))
     return out
 
 
@@ -176,7 +177,8 @@ def compute(dates, closes, vols, margin_by_date, small, large):
     if n < 300:
         return None
 
-    mom, trend, breadth, vol_amt, vola, margin_dev, risk_pref, idx = [], [], [], [], [], [], [], []
+    mom, trend, breadth, vol_amt, vola, margin_dev, risk_pref, drawdown, idx = \
+        [], [], [], [], [], [], [], [], []
 
     m_ser = align_map(dates, margin_by_date)
     s_ser = align_map(dates, small)
@@ -219,6 +221,10 @@ def compute(dates, closes, vols, margin_by_date, small, large):
             continue
         risk_pref.append((s_ser[i] / s_ser[i - 60] - 1.0) - (l_ser[i] / l_ser[i - 60] - 1.0))
 
+        # 8) 回撤深度：距近 250 交易日高点的回撤（越接近高点 = 越贪婪）
+        hi250 = max(closes[max(0, i - 249):i + 1])
+        drawdown.append(closes[i] / hi250 - 1.0)
+
         idx.append(i)
 
     if len(idx) < 60:
@@ -232,13 +238,14 @@ def compute(dates, closes, vols, margin_by_date, small, large):
         pct_rank_series(vol_amt),
         pct_rank_series(margin_dev),
         pct_rank_series(risk_pref),
+        pct_rank_series(drawdown),
     ]
 
     scores = [round(sum(r[j] for r in ranks) / len(ranks), 1) for j in range(len(idx))]
     last = len(idx) - 1
     rating, rating_cn = rating_of(scores[last])
     parts = {k: round(ranks[i][last], 1) for i, k in enumerate(
-        ["momentum", "trend", "breadth", "volatility", "volume", "margin", "riskon"])}
+        ["momentum", "trend", "breadth", "volatility", "volume", "margin", "riskon", "drawdown"])}
     points = [[dates[idx[j]], scores[j]] for j in range(max(0, len(idx) - KEEP_DAYS), len(idx))]
     return scores[last], rating, rating_cn, parts, points, dates[idx[last]]
 
@@ -280,10 +287,10 @@ def main() -> None:
 
     out = {
         "date": as_of,
-        "source": "自建多维模型（7 分项分位合成）",
+        "source": "自建多维模型（8 分项分位合成）",
         "model": ("分项：价格动量(收盘vs MA125) / 短期趋势(20日涨跌) / 均线广度(20日内收于MA20上方占比) / "
-                  "波动率(20日年化,反向) / 量能热度(成交量vs MA60) / 杠杆情绪(全市场融资余额vs MA20) / "
-                  "风险偏好(中证1000与沪深300 60日相对强弱)"),
+                  "波动率(20日年化,反向) / 量能热度(成交量vs MA60) / 融资热度(全市场融资买入额vs MA20) / "
+                  "风险偏好(中证1000与沪深300 60日相对强弱) / 回撤深度(距250日高点)"),
         "window": "近 3 年（750 个交易日）滚动分位",
         "indices": out_indices,
     }
