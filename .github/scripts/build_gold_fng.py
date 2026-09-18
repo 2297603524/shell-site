@@ -334,8 +334,8 @@ def build_rows(days, xag_map, usd_by_date, cftc_map):
         # ⑤ 距全史高点：业界线性刻度（贴高点=贪婪、回撤 10%≈中性、20%≈19），
         #    长牛市中分位法会把正常回调读成极端恐惧，这里必须用刻度而非分位
         if running_high > 0:
-            dd = max(0.0, closes[i] / running_high - 1.0)     # ≤0
-            row["athDist"] = 100.0 * math.exp(dd * 100.0 / 12.0)
+            dd = max(0.0, 1.0 - closes[i] / running_high)     # 回撤幅度（正数）
+            row["athDist"] = 100.0 * math.exp(-dd * 100.0 / 12.0)
         # ⑥ 趋势质量：20 日内收盘在 MA20 上方的天数占比
         ma20hits = 0
         for k in range(i - 19, i + 1):
