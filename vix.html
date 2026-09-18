@@ -293,7 +293,7 @@
     }
 
     /* ===== iOS 级动效与渲染性能 ===== */
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; overflow-x: hidden; }
     body { overscroll-behavior-y: none; }
 
     /* 卡片入场：位移更小、时长更短、弹簧收尾（不再是生硬的线性位移） */
@@ -352,15 +352,6 @@
 
     /* ===== 跨页面转场动画（View Transitions API，Chromium 111+）=====
        点击「← 返回首页」「详细观测」等链接时，旧页面上滑淡出、新页面自下滑入 */
-    @view-transition { navigation: auto; }
-    ::view-transition-old(root) {
-      animation: vtOut .22s cubic-bezier(.4, 0, 1, 1) both;
-    }
-    ::view-transition-new(root) {
-      animation: vtIn .34s cubic-bezier(0, 0, .2, 1) both;
-    }
-    @keyframes vtOut { to { opacity: 0; transform: translate3d(0, -8px, 0) scale(.992); } }
-    @keyframes vtIn { from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.992); } }
 
     /* ===== 帧率优化 ===== */
     /* 背景层提升为独立合成层：滚动时不再与内容一起重绘 */
@@ -1088,6 +1079,43 @@
       });
     }, { threshold: 0.08, rootMargin: '0px 0px -4% 0px' });
     for (var j = 0; j < els.length; j++) io.observe(els[j]);
+  })();
+
+  /* ===== iOS 导航转场：push（进详情从右推入）/ pop（返回向右滑出） ===== */
+  (function () {
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) return;
+    var EASE = 'cubic-bezier(.32,.72,0,1)';
+    var dir = null;
+    try { dir = sessionStorage.getItem('nav-dir'); } catch (e) {}
+    /* 进入动画：push 从右推入；pop 从左滑回 */
+    if (dir === 'push') {
+      document.documentElement.animate(
+        [{ transform: 'translate3d(26%,0,0)', opacity: .55 }, { transform: 'none', opacity: 1 }],
+        { duration: 340, easing: EASE });
+    } else if (dir === 'pop') {
+      document.documentElement.animate(
+        [{ transform: 'translate3d(-20%,0,0)', opacity: .5 }, { transform: 'none', opacity: 1 }],
+        { duration: 340, easing: EASE });
+    }
+    try { sessionStorage.removeItem('nav-dir'); } catch (e) {}
+    /* 拦截站内链接：先播滑出动画，再导航（.back=pop 返回；其它=push 进入） */
+    document.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a || a.target === '_blank' || e.metaKey || e.ctrlKey || e.button !== 0) return;
+      var href = a.getAttribute('href') || '';
+      if (/^(https?:|mailto:|javascript:)/.test(href)) return;
+      e.preventDefault();
+      var d2 = (a.classList && a.classList.contains('back')) ? 'pop' : 'push';
+      try { sessionStorage.setItem('nav-dir', d2); } catch (err) {}
+      var anim = d2 === 'push'
+        ? [{ transform: 'none', opacity: 1 }, { transform: 'translate3d(-20%,0,0)', opacity: .4 }]
+        : [{ transform: 'none', opacity: 1 }, { transform: 'translate3d(24%,0,0)', opacity: .4 }];
+      document.documentElement.animate(anim, {
+        duration: 270, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards'
+      });
+      setTimeout(function () { location.href = href; }, 255);
+    }, false);
   })();
 </script>
 </body>
