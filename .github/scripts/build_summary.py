@@ -67,6 +67,25 @@ def main() -> None:
     except Exception as e:  # noqa: BLE001
         print("fng summary failed: %s" % e)
 
+    # ---- 国际黄金恐贪指数 ----
+    try:
+        g = _load(os.path.join(data_dir, "gold-fng.json"))
+        gpts = g.get("points") or []
+        gdelta5 = None
+        if len(gpts) > 6:
+            gdelta5 = round(float(g["score"]) - float(gpts[-6][1]), 1)
+        out["gold"] = {
+            "name": g.get("shortName") or g.get("name"),
+            "score": g.get("score"),
+            "rating_cn": g.get("rating_cn"),
+            "date": g.get("date"),
+            "delta5": gdelta5,
+            "n": len(g.get("parts") or {}),
+            "spark": [[p[0], p[1]] for p in gpts[-SPARK_N:]],
+        }
+    except Exception as e:  # noqa: BLE001
+        print("gold summary failed: %s" % e)
+
     if not out:
         print("nothing built, keep old file")
         sys.exit(1)

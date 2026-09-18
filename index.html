@@ -485,6 +485,7 @@
         <a href="./index.html" class="cur">首页</a>
         <a href="./vix.html">VIX</a>
         <a href="./fng.html">恐贪</a>
+        <a href="./gold.html">黄金</a>
       </span>
     </nav>
   </header>
@@ -551,18 +552,33 @@
         </div>
       </section>
 
-      <!-- 预留占位卡 ×4 -->
-      <section class="card tile tile-empty" aria-hidden="true">
+      <!-- 国际黄金恐贪指数卡 -->
+      <section class="card tile" aria-label="国际黄金恐贪指数">
         <div class="tile-top">
-          <div class="tile-title">✧ 新指标<span class="sub">等待接入数据</span></div>
-          <span class="badge">筹备中</span>
+          <div class="tile-title">🌍 黄金恐贪指数<span class="sub">6 因子加权模型 · 近 3 年分位</span></div>
+          <span class="badge" id="auLevel">加载中…</span>
         </div>
         <div class="tile-mid">
-          <div class="vix-price flat ph-text">--</div>
-          <div class="vix-chg flat ph-text">待接入</div>
+          <div class="vix-price flat" id="auScore">--</div>
+          <div class="vix-chg flat" id="auDelta">等待数据…</div>
         </div>
-        <div class="tile-body"><div class="ph-chart">✧</div></div>
-        <div class="tile-foot"><div class="tile-time">规划中 · 敬请期待 (´▽`)</div></div>
+        <div class="tile-body">
+          <a class="spark-link" href="./gold.html" title="查看黄金 K 线与恐贪详情">
+            <svg id="auSpark" viewBox="0 0 800 44" preserveAspectRatio="none" aria-label="黄金恐贪指数近 30 日走势"></svg>
+            <span class="cap">
+              <span id="auSparkLabel">近 30 日走势</span>
+              <span>K 线详情 →</span>
+            </span>
+          </a>
+        </div>
+        <div class="tile-foot">
+          <div class="tile-time" id="auTime">数据日期 --</div>
+          <div class="tile-actions">
+            <span id="auErr" class="vix-err"></span>
+            <button class="btn" id="auRefresh" type="button">✧ 刷新</button>
+            <a class="btn detail" href="./gold.html">黄金详情 →</a>
+          </div>
+        </div>
       </section>
 
       <section class="card tile tile-empty" aria-hidden="true">
@@ -735,7 +751,9 @@
     var elVixPrice = $('vixPrice'), elVixChg = $('vixChg'), elVixTime = $('vixTime'),
         elVixLevel = $('vixLevel'), elVixErr = $('vixErr'), elVixBtn = $('vixRefresh'),
         elFgScore = $('fgScore'), elFgDelta = $('fgDelta'), elFgLevel = $('fgLevel'),
-        elFgTime = $('fgTime'), elFgErr = $('fgErr'), elFgBtn = $('fgRefresh');
+        elFgTime = $('fgTime'), elFgErr = $('fgErr'), elFgBtn = $('fgRefresh'),
+        elAuScore = $('auScore'), elAuDelta = $('auDelta'), elAuLevel = $('auLevel'),
+        elAuTime = $('auTime'), elAuErr = $('auErr'), elAuBtn = $('auRefresh');
 
     function setCls(el, c) { el.classList.remove('up', 'down', 'flat'); el.classList.add(c); }
     function f2(n, d) {
@@ -789,7 +807,7 @@
     }
 
     /* ---------- 渲染 ---------- */
-    var lastVix = null, lastFg = null;   // 记录上次值，变化时触发闪光反馈
+    var lastVix = null, lastFg = null, lastAu = null;   // 记录上次值，变化时触发闪光反馈
 
     function renderVix(d) {
       var price = parseFloat(d.price), prev = parseFloat(d.prev);
@@ -836,8 +854,30 @@
       } else {
         elFgDelta.textContent = '';
       }
-      elFgTime.textContent = '数据日期 ' + (d.date || '--') + (d.n ? ' · ' + d.n + ' 分项合成' : '');
+      elFgTime.textContent = '数据日期 ' + (d.date || '--') + (d.n ? ' · ' + d.n + ' 因子合成' : '');
       if (d.spark) drawMini($('fgSpark'), $('fgSparkLabel'), d.spark, 'fg');
+    }
+
+    function renderGold(d) {
+      var s = parseFloat(d.score);
+      if (!isFinite(s)) return;
+      if (lastAu !== null && lastAu !== s && window.__flash) window.__flash(elAuScore);
+      lastAu = s;
+      var c = fgCls(s);
+      tweenNum(elAuScore, s, function (v) { return v.toFixed(1); });
+      elAuScore.className = 'vix-price fg-c' + c;
+      elAuLevel.textContent = d.rating_cn || '--';
+      elAuLevel.className = 'badge bg-c' + c;
+
+      var dv = parseFloat(d.delta5);
+      if (isFinite(dv)) {
+        elAuDelta.textContent = (dv > 0 ? '+' : '') + dv.toFixed(1) + ' · 较 5 个交易日前';
+        elAuDelta.className = 'vix-chg fg-c' + c;
+      } else {
+        elAuDelta.textContent = '';
+      }
+      elAuTime.textContent = '数据日期 ' + (d.date || '--') + (d.n ? ' · ' + d.n + ' 因子合成' : '');
+      if (d.spark) drawMini($('auSpark'), $('auSparkLabel'), d.spark, 'au');
     }
 
     function loadAll() {
@@ -845,6 +885,7 @@
       busy = true;
       elVixBtn.disabled = true;
       elFgBtn.disabled = true;
+      elAuBtn.disabled = true;
       fetch('./data/summary.json?r=' + Date.now(), { cache: 'no-store' })
         .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(function (d) {
@@ -853,9 +894,11 @@
             lastPayload = key;
             if (d.vix) renderVix(d.vix);
             if (d.fng) renderFng(d.fng);
+            if (d.gold) renderGold(d.gold);
           }
           elVixErr.textContent = '';
           elFgErr.textContent = '';
+          elAuErr.textContent = '';
           hasData = true;
           backoff = false;
         })
@@ -864,16 +907,19 @@
           var msg = hasData ? '⚠ 数据源暂不可用，显示上次数据' : '⚠ 加载失败，稍后重试';
           elVixErr.textContent = msg;
           elFgErr.textContent = msg;
+          elAuErr.textContent = msg;
         })
         .finally(function () {
           busy = false;
           elVixBtn.disabled = false;
           elFgBtn.disabled = false;
+          elAuBtn.disabled = false;
         });
     }
 
     elVixBtn.addEventListener('click', loadAll);
     elFgBtn.addEventListener('click', loadAll);
+    elAuBtn.addEventListener('click', loadAll);
 
     setInterval(function () { if (!backoff) loadAll(); }, REFRESH_MS);   // 正常：5 秒
     setInterval(function () { if (backoff) loadAll(); }, 15000);         // 失败退避：15 秒
