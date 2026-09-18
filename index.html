@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description" content="市场情绪看板 —— VIX 实时观测，数据来自 CBOE 官方。" />
   <title>✧ 市场情绪看板 · VIX 观测所 ✧</title>
   <style>
@@ -22,6 +22,7 @@
       --radius: 18px;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
     body {
       font-family: "Yuanti SC", "YouYuan", "幼圆", "PingFang SC", "Microsoft YaHei", sans-serif;
       color: var(--ink);
@@ -31,6 +32,8 @@
       background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 48%, var(--bg-bottom) 100%);
       background-attachment: fixed;
       overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-font-smoothing: antialiased;
     }
 
     /* ===== 樱花 ===== */
@@ -152,16 +155,37 @@
       .spark-link .cap { display: none; }
       .tile-time { margin-bottom: 6px; }
     }
-    /* 窄屏：取消正方形、单列铺开、整体收紧 */
+    /* ===== 触摸设备优化 ===== */
+    /* 触摸屏没有真正的 hover，点完会「卡住」在悬浮态 —— 取消 hover 效果，改用按下反馈 */
+    @media (hover: none) {
+      .tile:hover { transform: none; box-shadow: var(--shadow); }
+      .btn:hover { border-color: var(--line); color: var(--ink); }
+      .btn.detail:hover { color: #fff; }
+      nav a:hover { color: var(--muted); }
+      .spark-link:hover { color: var(--muted); }
+      .spark-link:hover .arrow { transform: none; }
+    }
+    .tile:active { transform: scale(.985); }
+    .btn:active { transform: scale(.96); }
+
+    /* 窄屏：取消正方形、单列铺开、触控目标放大 */
     @media (max-width: 480px) {
-      .tile { aspect-ratio: auto; min-height: 0; padding: 14px 16px; }
-      .wall { grid-template-columns: 1fr; }
-      main { padding: 12px 10px 32px; }
-      header { margin: 8px 8px 0; padding: 8px 14px; }
-      .logo { font-size: 14px; }
-      nav a { font-size: 12px; margin-left: 10px; }
-      .hero { min-height: 96px; }
-      .vix-price { font-size: 40px; }
+      .tile { aspect-ratio: auto; min-height: 0; padding: 16px; }
+      .wall { grid-template-columns: 1fr; gap: 12px; }
+      main { padding: 12px 12px calc(28px + env(safe-area-inset-bottom)); }
+      header { margin: 8px 8px 0; padding: 8px 14px; top: calc(6px + env(safe-area-inset-top)); }
+      .logo { font-size: 13px; letter-spacing: 0; }
+      nav a { font-size: 13px; margin-left: 12px; }
+      .hero { min-height: 104px; border-width: 2px; border-radius: 14px; }
+      .vix-price { font-size: 42px; }
+      .vix-chg { font-size: 16px; }
+      .badge { font-size: 12px; padding: 4px 12px; }
+      /* 触控目标放大到 ≥40px 高 */
+      .btn { padding: 9px 16px; font-size: 13px; }
+      .tile-actions { gap: 8px; }
+      .tile-time { font-size: 11.5px; }
+      .spark-link svg { height: 52px; }
+      .spark-link .cap { font-size: 11px; }
     }
   </style>
 </head>
@@ -217,7 +241,8 @@
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     var GLYPHS = ['🌸', '❀', '✿', '🌸', '❀'];
     var colors = ['#ffb7d9', '#ffc7e5', '#f5c7ff', '#ffd6ea'];
-    for (var i = 0; i < 14; i++) {
+    var COUNT = (window.innerWidth < 640) ? 8 : 14;   // 小屏减少粒子，省电省性能
+    for (var i = 0; i < COUNT; i++) {
       var s = document.createElement('span');
       s.className = 'sakura';
       var dur = 9 + Math.random() * 10;

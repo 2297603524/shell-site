@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description" content="VIX 恐慌指数详细观测 —— 实时行情、120日走势、区间统计与解读。" />
   <title>✧ VIX 恐慌指数 · 详细观测 ✧</title>
   <style>
@@ -20,6 +20,7 @@
       --radius: 22px;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
     body {
       font-family: "Yuanti SC", "YouYuan", "幼圆", "PingFang SC", "Microsoft YaHei", sans-serif;
       color: var(--ink);
@@ -29,6 +30,8 @@
       background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 48%, var(--bg-bottom) 100%);
       background-attachment: fixed;
       overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-font-smoothing: antialiased;
     }
 
     /* ===== 樱花 ===== */
@@ -175,6 +178,33 @@
       backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
       border-top: 2px solid var(--line);
     }
+    /* ===== 手机端优化 ===== */
+    @media (hover: none) {
+      .rbtn:hover { color: var(--muted); }
+      .back:hover { transform: none; border-color: var(--line); color: var(--ink); }
+    }
+    @media (max-width: 480px) {
+      main { padding: 12px 12px calc(28px + env(safe-area-inset-bottom)); }
+      header { margin: 8px 8px 0; padding: 8px 14px; top: calc(6px + env(safe-area-inset-top)); }
+      .logo { font-size: 14px; }
+      .back { padding: 8px 14px; font-size: 13px; }
+      .card { padding: 15px; }
+      .price-main { gap: 10px; }
+      .price-chg { font-size: 16px; }
+      .badge { font-size: 12px; padding: 5px 12px; }
+      /* 触控目标放大 */
+      .rbtn { padding: 8px 13px; font-size: 12px; }
+      .kv-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 14px; }
+      .kv { padding: 10px 8px; border-radius: 12px; }
+      .kv .k { font-size: 11px; }
+      .kv .v { font-size: 16px; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .stat { padding: 12px; }
+      .legend { grid-template-columns: 1fr; }
+      .chart-foot { font-size: 11px; }
+      .tip { font-size: 11px; padding: 5px 8px; }
+      .ov-meta { font-size: 12px; }
+    }
   </style>
 </head>
 <body>
@@ -240,7 +270,7 @@
       </div>
       <div class="chart-foot">
         <span>虚线参考：15 平静 / 20 警惕 / 30 恐慌（VIX 绝对值分档）</span>
-        <span id="chartHint">鼠标悬停查看具体数值</span>
+        <span id="chartHint">电脑悬停 / 手机滑动图表查看数值</span>
       </div>
     </section>
 
@@ -328,8 +358,13 @@
     }
 
     /* ---------- 走势图 ---------- */
-    var PAD = { l: 48, r: 56, t: 18, b: 36 };
-    var W = 820, H = 320;
+    // 按实际可见宽度选择画布比例：手机更「方」，曲线才有起伏感；桌面用宽画布
+    function calcSize() {
+      var cw = wrap.clientWidth || 820;
+      if (cw < 460) return { W: 400, H: 300, PAD: { l: 36, r: 42, t: 16, b: 32 } };
+      if (cw < 700) return { W: 620, H: 310, PAD: { l: 44, r: 50, t: 17, b: 34 } };
+      return { W: 820, H: 320, PAD: { l: 48, r: 56, t: 18, b: 36 } };
+    }
 
     var MAXP = 1400;  // 绘图抽样上限，全量视图下保持流畅
 
@@ -403,6 +438,8 @@
     function drawChart() {
       var pts = plotPoints();
       if (!pts.length) return;
+      var sz = calcSize(), W = sz.W, H = sz.H, PAD = sz.PAD;
+      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
       var vs = pts.map(function (p) { return p[1]; });
       var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
       var padV = (mx - mn) * 0.07 || 1;
@@ -466,7 +503,7 @@
       svg.innerHTML = s;
 
       // 记录映射供 hover 使用
-      svg._map = { pts: pts, nx: nx, ny: ny, x0: x0, x1: x1 };
+      svg._map = { pts: pts, nx: nx, ny: ny, x0: x0, x1: x1, W: W, H: H };
 
       var sub;
       if (MODE === 'min') {
@@ -486,7 +523,9 @@
     function onMove(ev) {
       if (!svg._map) return;
       var map = svg._map, pts = map.pts;
+      var W = map.W || 820, H = map.H || 320;
       var rect = svg.getBoundingClientRect();
+      if (!rect.width) return;
       var px = (ev.clientX - rect.left) / rect.width * W;
       if (px < map.x0 - 10 || px > map.x1 + 10) { hideHover(); return; }
       // x 等距，直接算出最近索引
@@ -497,7 +536,7 @@
       var hl = svg.querySelector('#hoverLine'), hd = svg.querySelector('#hoverDot');
       hl.setAttribute('x1', x); hl.setAttribute('x2', x); hl.setAttribute('opacity', '0.9');
       hd.setAttribute('cx', x); hd.setAttribute('cy', y); hd.setAttribute('opacity', '1');
-      // tooltip 定位（换算成容器内像素）
+      // tooltip 定位（换算成容器内像素，并限制在容器内避免手机上溢出）
       var leftPx = x / W * rect.width;
       var topPx = y / H * rect.height;
       var txt;
@@ -510,8 +549,9 @@
         txt = p[0] + '　收 ' + f2(p[1]) + '　开 ' + f2(p[2]) + '　高 ' + f2(p[3]) + '　低 ' + f2(p[4]);
       }
       tip.textContent = txt;
-      tip.style.left = leftPx + 'px';
-      tip.style.top = topPx + 'px';
+      var maxL = Math.max(rect.width - 56, 56);
+      tip.style.left = Math.min(Math.max(leftPx, 56), maxL) + 'px';
+      tip.style.top = Math.max(topPx, 14) + 'px';
       tip.classList.add('on');
     }
 
@@ -524,6 +564,17 @@
 
     wrap.addEventListener('mousemove', onMove);
     wrap.addEventListener('mouseleave', hideHover);
+    // 触摸设备：滑动图表查看数值（passive 保持纵向滚动流畅）
+    wrap.addEventListener('touchstart', function (e) { if (e.touches[0]) onMove(e.touches[0]); }, { passive: true });
+    wrap.addEventListener('touchmove', function (e) { if (e.touches[0]) onMove(e.touches[0]); }, { passive: true });
+    wrap.addEventListener('touchend', hideHover);
+
+    // 尺寸变化（横竖屏切换等）按新比例重绘
+    var rsTimer = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(rsTimer);
+      rsTimer = setTimeout(function () { hideHover(); drawChart(); }, 200);
+    });
 
     document.querySelectorAll('.rbtn[data-days]').forEach(function (b) {
       b.addEventListener('click', function () {
