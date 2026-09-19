@@ -2,8 +2,7 @@
 """构建 A 股各主要指数的恐贪指数（9 分项多维模型，覆盖指数成立以来全历史）→ data/fear-greed.json
 
 数据源（全部免密钥）:
-    指数日K:  东财 push2his.eastmoney.com  →  中证官网 csindex.com.cn（官方行情兜底）
-              →  腾讯 web.ifzq.gtimg.cn（分段兜底），尽量取全历史
+    指数日K:  东财 push2his.eastmoney.com  →  腾讯 web.ifzq.gtimg.cn（兜底），尽量取全历史
     融资数据: 东财 datacenter RPTA_RZRQ_LSHJ（全市场融资买入额，2010-03 融资融券业务启动以来）
     指数估值: 乐咕乐股 legulegu.com（月度 PE-TTM 历史，部分自 2005 年起）
 
@@ -47,8 +46,6 @@ DC_MARGIN = ("https://datacenter-web.eastmoney.com/api/data/v1/get"
              "&sortColumns=DIM_DATE&sortTypes=-1&source=WEB&client=WEB")
 LG_PAGE = "https://legulegu.com/stockdata/sz50-ttm-lyr"
 LG_API = "https://legulegu.com/api/stockdata/index-basic-pe"
-CS_PERF = ("https://www.csindex.com.cn/csindex-home/perf/index-perf"
-           "?indexCode=%s&startDate=%d0101&endDate=20501231")
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36")
 
@@ -56,23 +53,15 @@ UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 INDICES = [
     ("1.000001", "sh000001", "上证指数", 1990),
     ("0.399001", "sz399001", "深证成指", 1991),
-    ("1.000300", "sh000300", "沪深300", 2005),
-    ("1.000016", "sh000016", "上证50", 2004),
-    ("1.000905", "sh000905", "中证500", 2007),
-    ("1.000852", "sh000852", "中证1000", 2005),
-    ("2.932000", "sh932000", "中证2000", 2013),   # 中证自有代码段：东财市场位为 2
     ("0.399006", "sz399006", "创业板指", 2010),
+    ("1.000300", "sh000300", "沪深300", 2005),
+    ("1.000905", "sh000905", "中证500", 2007),
+    ("1.000016", "sh000016", "上证50", 2004),
     ("1.000688", "sh000688", "科创50", 2020),
-    ("1.000922", "sh000922", "中证红利", 2005),
     ("1.517400", "sh517400", "黄金股", 2021),   # 黄金股ETF（跟踪中证沪深300黄金股指数）
 ]
 SMALL_CAP = ("1.000852", "sh000852", "中证1000", 2014)
 LARGE_CAP = ("1.000300", "sh000300", "沪深300", 2005)
-# 风险偏好分项特例：板块/风格指数没有对应的「小盘基准」，
-# 用「自身 vs 沪深300」的相对强弱衡量该风格的风险偏好（相对沪深300 跑赢 → 情绪贪婪）
-SECTOR_RISKON = {"黄金股", "中证2000", "中证红利"}
-# 中证官网（csindex.com.cn）兜底映射：东财/腾讯都不可用时的第三级数据源（官方行情，免密钥）
-CSI_FALLBACK = {"中证2000": "932000", "中证1000": "000852", "中证红利": "000922"}
 
 VAL_MAP = {
     "上证指数": "000010.SH",
@@ -81,10 +70,7 @@ VAL_MAP = {
     "沪深300": "000300.SH",
     "中证500": "000905.SH",
     "上证50": "000016.SH",
-    "科创50": "000688.SH",
-    "中证1000": "000852.SH",
-    "中证2000": "932000.CSI",
-    "中证红利": "000922.SH",
+    "科创50": "399673.SZ",
 }
 
 KLIMIT = 9000        # 日K 抓取上限（覆盖上证指数 1990 年至今）
@@ -131,8 +117,8 @@ def fetch_em(secid: str, limit: int = KLIMIT):
         try:
             dates.append(f[0])
             closes.append(float(f[2]))
-            vols.append(float(f[6]))   # 量能用成交额（剔除股本变动干扰），比成交量更真实
-        except (ValueError, IndexError):
+            vols.append(float(f[5]))
+        except ValueError:
             continue
     if not dates:
         raise ValueError("empty klines")
@@ -140,15 +126,7 @@ def fetch_em(secid: str, limit: int = KLIMIT):
 
 
 def _tx_rows(code: str, start: str, end: str):
-    d = {}
-    for attempt in range(3):          # 单段偶发失败重试，避免整体中断
-        try:
-            d = ((_get(TX_KLINE_RANGE % (code, start, end), timeout=30).get("data")) or {}).get(code) or {}
-            break
-        except Exception:  # noqa: BLE001
-            if attempt == 2:
-                raise
-            time.sleep(1.5)
+    d = ((_get(TX_KLINE_RANGE % (code, start, end), timeout=30).get("data")) or {}).get(code) or {}
     rows = d.get("qfqday") or d.get("day") or []
     out = []
     for row in rows:
@@ -183,62 +161,14 @@ def fetch_tx(code: str, first_year: int = 1990, seg: int = 3, workers: int = 3):
     return keys, [dedup[k][0] for k in keys], [dedup[k][1] for k in keys]
 
 
-def fetch_csindex(index_code: str, first_year: int):
-    """中证指数官网官方日行情（免密钥），作为第三级兜底。
-    返回 (dates, closes, vols)；量能用 tradingValue（成交金额，亿元）"""
-    url = CS_PERF % (index_code, max(2005, first_year))
-    d = None
-    for attempt in range(3):
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": UA, "Referer": "https://www.csindex.com.cn/"})
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                d = (json.load(resp).get("data")) or []
-            break
-        except Exception:  # noqa: BLE001
-            if attempt == 2:
-                raise
-            time.sleep(2)
-    dates, closes, vols = [], [], []
-    for r in d:
-        try:
-            dt = str(r.get("tradeDate") or "")
-            if len(dt) != 8:
-                continue
-            c = float(r.get("close") or 0)
-            v = float(r.get("tradingValue") or 0)
-        except (TypeError, ValueError):
-            continue
-        if c > 0:
-            dates.append("%s-%s-%s" % (dt[:4], dt[4:6], dt[6:8]))
-            closes.append(c)
-            vols.append(v)
-    if not dates:
-        raise ValueError("empty csindex rows")
-    return dates, closes, vols
-
-
-def get_kline(label: str, em_id: str, tx_code: str, first_year: int = 1990, csi_code: str = None):
-    """东财优先（单次全量），失败退避重试一次；再走中证官网兜底；最后腾讯分段"""
-    for attempt in range(2):
-        try:
-            name, dates, closes, vols = fetch_em(em_id)
-            if len(dates) > 1000:          # 东财可用且拿到长历史，直接用
-                return name, dates, closes, vols
-        except Exception:  # noqa: BLE001
-            pass
-        if attempt == 0:
-            time.sleep(2.5)                # 东财偶发限流：退避后重试
-    if csi_code:
-        try:
-            dates, closes, vols = fetch_csindex(csi_code, first_year)
-            print("   fallback → 中证官网: %s（%s 起 %d 条）" % (label, dates[0], len(dates)))
-            return label, dates, closes, vols
-        except Exception as e:  # noqa: BLE001
-            print("   中证官网兜底失败: %s" % e)
+def get_kline(label: str, em_id: str, tx_code: str, first_year: int = 1990):
     try:
-        dates, closes, vols = fetch_tx(tx_code, first_year)
-    except Exception as e:  # noqa: BLE001
-        raise ValueError("东财/中证官网/腾讯均不可用（最后错误: %s）" % e)
+        name, dates, closes, vols = fetch_em(em_id)
+        if len(dates) > 1000:          # 东财可用且拿到长历史，直接用
+            return name, dates, closes, vols
+    except Exception:  # noqa: BLE001
+        pass
+    dates, closes, vols = fetch_tx(tx_code, first_year)
     print("   fallback → 腾讯分段: %s（%s 起 %d 条）" % (label, dates[0], len(dates)))
     return label, dates, closes, vols
 
@@ -276,32 +206,26 @@ def fetch_valuation():
 
         out = {}
         for code in sorted(set(VAL_MAP.values())):
-            series = None
-            for attempt in range(2):      # 乐咕限流（429）较常见：退避重试一次
-                try:
-                    req = urllib.request.Request(
-                        "%s?token=%s&indexCode=%s" % (LG_API, token, code),
-                        headers={"User-Agent": UA, "X-CSRF-TOKEN": csrf, "Referer": LG_PAGE})
-                    rows = (json.loads(opener.open(req, timeout=45).read()) or {}).get("data") or []
-                    series = [(str(r.get("date"))[:7], float(r["ttmPe"]))
-                              for r in rows if r.get("date") and r.get("ttmPe")]
-                    break
-                except Exception as e:  # noqa: BLE001
-                    if attempt == 0:
-                        time.sleep(3.0)
-                    else:
-                        print("   估值 %s 失败: %s" % (code, e))
-            if not series:
-                print("   估值 %s 无数据" % code)
-                continue
-            q = {}
-            for i, (mo, v) in enumerate(series):
-                lo = max(0, i - VAL_WINDOW + 1)
-                win = [x[1] for x in series[lo:i + 1]]
-                q[mo] = round(100.0 * sum(1 for x in win if x <= v) / len(win), 1)
-            out[code] = q
-            print("   估值 %-11s %d 个月（%s 起）" % (code, len(series), series[0][0]))
-            time.sleep(1.2)
+            try:
+                req = urllib.request.Request(
+                    "%s?token=%s&indexCode=%s" % (LG_API, token, code),
+                    headers={"User-Agent": UA, "X-CSRF-TOKEN": csrf, "Referer": LG_PAGE})
+                rows = (json.loads(opener.open(req, timeout=45).read()) or {}).get("data") or []
+                series = [(str(r.get("date"))[:7], float(r["ttmPe"]))
+                          for r in rows if r.get("date") and r.get("ttmPe")]
+                if not series:
+                    print("   估值 %s 无数据" % code)
+                    continue
+                q = {}
+                for i, (mo, v) in enumerate(series):
+                    lo = max(0, i - VAL_WINDOW + 1)
+                    win = [x[1] for x in series[lo:i + 1]]
+                    q[mo] = round(100.0 * sum(1 for x in win if x <= v) / len(win), 1)
+                out[code] = q
+                print("   估值 %-11s %d 个月（%s 起）" % (code, len(series), series[0][0]))
+            except Exception as e:  # noqa: BLE001
+                print("   估值 %s 失败: %s" % (code, e))
+            time.sleep(0.7)
         return out
     except Exception as e:  # noqa: BLE001
         print("   估值数据源不可用（该分项跳过）: %s" % e)
@@ -361,9 +285,7 @@ def build_rows(dates, closes, vols, margin_by_date, small, large, val_by_month):
             "date": dates[i],
             "close": closes[i],
             "momentum": closes[i] / ma125 - 1.0,
-            # 双周期趋势：短窗 20 日为主 + 中窗 60 日确认，过滤单窗口噪音
-            "trend": 0.6 * (closes[i] / closes[i - 20] - 1.0)
-                     + 0.4 * (closes[i] / closes[i - 60] - 1.0),
+            "trend": closes[i] / closes[i - 20] - 1.0,
         }
         ma20hits = 0
         for k in range(i - 19, i + 1):
@@ -450,17 +372,6 @@ def sample_rows(rows, recent=RECENT_DAYS):
     return idx
 
 
-def smooth_scores(rows, span=3):
-    """对合成分做 3 日 EMA 平滑（对标 CNN Fear & Greed 的 smoothed 版），
-    降低单日毛刺；分项明细保持当日原始分位不变"""
-    a = 2.0 / (span + 1)
-    prev = None
-    for r in rows:
-        s = r["score"]
-        prev = s if prev is None else prev + a * (s - prev)
-        r["score"] = round(prev, 1)
-
-
 def compute(dates, closes, vols, margin_by_date, small, large, val_by_month, risk_pair=None):
     # 风险偏好基准特异化：板块类（如黄金股）传 risk_pair=(基准A收盘, 基准B收盘)，
     # 即「自身 vs 沪深300」的相对强弱；宽基类不传，用默认的「中证1000 vs 沪深300」
@@ -473,7 +384,6 @@ def compute(dates, closes, vols, margin_by_date, small, large, val_by_month, ris
     rows = score_rows(rows)
     if len(rows) < 30:
         return None
-    smooth_scores(rows)        # 3 日 EMA 平滑输出，消单日毛刺
     if len(rows) > 210:
         rows = rows[60:]           # 冷启动分位不可靠：序列开头的窗口未满，读数虚高/虚低
 
@@ -504,15 +414,14 @@ def main() -> None:
     out_indices, as_of = [], ""
     for em_id, tx_code, label, first_year in INDICES:
         try:
-            name, dates, closes, vols = get_kline(label, em_id, tx_code, first_year,
-                                                  CSI_FALLBACK.get(label))
+            name, dates, closes, vols = get_kline(label, em_id, tx_code, first_year)
         except Exception as e:  # noqa: BLE001
             print("skip %s: %s" % (label, e))
             continue
 
         vcode = VAL_MAP.get(name) or VAL_MAP.get(label)
         rp = None
-        if label in SECTOR_RISKON:                 # 板块/风格类：风险偏好 = 自身 vs 沪深300
+        if label == "黄金股":                      # 板块类：风险偏好 = 自身 vs 沪深300
             l_map = dict(zip(l_dates, l_closes))
             rp = (dates, closes, [l_map.get(d) for d in dates])
         res = compute(dates, closes, vols, margin_map, small_map, large_map,
@@ -529,7 +438,7 @@ def main() -> None:
         })
         print("ok  %-8s %6s  %s | 全史 %d 日至 %s，输出 %d 点（%s ~ %s）" % (
             name, score, rating_cn, total, last_date, len(points), points[0][0], points[-1][0]))
-        time.sleep(1.5)
+        time.sleep(1.0)
 
     if not out_indices:
         print("all indices failed, keep old file")
@@ -540,8 +449,7 @@ def main() -> None:
         "date": as_of,
         "source": "自建多维模型（%d 分项分位合成）" % n_parts,
         "model": ("加权合成（价格动量1.6 / 量能1.6 / 融资1.4 / 短期趋势1 / 均线广度1 / "
-                  "回撤1 / 风险偏好0.8 / 波动率0.5）；估值分位为参考项，不计入合成；"
-                  "趋势为 20/60 日双周期、量能用成交额、输出经 3 日 EMA 平滑"),
+                  "回撤1 / 风险偏好0.8 / 波动率0.5）；估值分位为参考项，不计入合成"),
         "window": "价格类取近 3 年（750 交易日）滚动分位；估值取近 60 个月 PE 分位",
         "weights": WEIGHTS,
         "sampling": "近 %d 个交易日为日线（标记 d），更早按每月最后一个交易日采样（标记 m）；时间跨度覆盖指数成立以来" % RECENT_DAYS,

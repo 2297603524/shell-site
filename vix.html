@@ -6,12 +6,6 @@
   <meta name="description" content="VIX 恐慌指数详细观测 —— 实时行情、120日走势、区间统计与解读。" />
   <title>VIX 恐慌指数 · 樱市罗盘</title>
   <meta name="theme-color" content="#ffe9f5" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23ff7eb6'%3E%3Cellipse cx='12' cy='6.6' rx='2.7' ry='4.1'/%3E%3Cellipse cx='12' cy='6.6' rx='2.7' ry='4.1' transform='rotate(72 12 12)'/%3E%3Cellipse cx='12' cy='6.6' rx='2.7' ry='4.1' transform='rotate(144 12 12)'/%3E%3Cellipse cx='12' cy='6.6' rx='2.7' ry='4.1' transform='rotate(216 12 12)'/%3E%3Cellipse cx='12' cy='6.6' rx='2.7' ry='4.1' transform='rotate(288 12 12)'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='2.2' fill='%23fff8fc'/%3E%3C/svg%3E" />
-  <link rel="canonical" href="https://2297603524.github.io/shell-site/vix.html" />
-  <meta property="og:url" content="https://2297603524.github.io/shell-site/vix.html" />
-  <meta property="og:site_name" content="樱市罗盘" />
-  <meta property="og:image" content="https://2297603524.github.io/shell-site/img/banner.webp" />
-  <meta name="twitter:card" content="summary_large_image" />
   <meta property="og:title" content="VIX 恐慌指数 · 樱市罗盘" />
   <meta property="og:description" content="30 天隐含波动率详细观测，CBOE 官方数据" />
   <meta property="og:type" content="website" />
@@ -57,31 +51,6 @@
       background: url('./img/bg.webp') center top / cover no-repeat;
       pointer-events: none;
     }
-    /* ===== 柔光叠加：顶部提亮 + 底部晕色，让卡片从云朵背景里更清晰地浮起 ===== */
-    body::after {
-      content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-      background:
-        radial-gradient(1100px 460px at 82% -8%, rgba(255,255,255,.5), transparent 62%),
-        radial-gradient(900px 420px at 8% 108%, rgba(255,214,234,.4), transparent 60%),
-        linear-gradient(180deg, rgba(255,233,245,.32) 0%, rgba(242,233,255,.18) 45%, rgba(226,242,255,.4) 100%);
-    }
-
-    /* ===== 漂浮光斑（bokeh）：梦幻氛围，只动 transform，合成器友好 ===== */
-    .bokeh {
-      position: fixed; z-index: 0; pointer-events: none; border-radius: 50%;
-      background: radial-gradient(circle, rgba(255,255,255,.9), rgba(255,183,217,.35) 45%, transparent 70%);
-      filter: blur(2px);
-      animation: bokehFloat var(--bd, 18s) ease-in-out infinite alternate;
-    }
-    @keyframes bokehFloat {
-      from { transform: translate3d(0, 0, 0) scale(1); }
-      to   { transform: translate3d(var(--bx, 30px), -48px, 0) scale(1.16); }
-    }
-    /* ===== 角落樱花剪影：大朵沉在右下、小朵点缀左侧，压低透明度当背景装饰 ===== */
-    .corner-sakura { position: fixed; z-index: 0; pointer-events: none; }
-    .corner-sakura svg { width: 100%; height: 100%; display: block; }
-    .corner-sakura.cs-br { right: -48px; bottom: -42px; }
-    .corner-sakura.cs-tl { left: -34px; top: 24vh; }
 
     /* ===== 樱花（单层 GPU 动画：下落+漂移+旋转一次完成） ===== */
     .sakura {
@@ -108,42 +77,15 @@
     /* 同批次的轻微错峰 */
     .in:nth-child(2 of .in) { transition-delay: .04s; }
 
-    @media (prefers-reduced-motion: reduce) { .sakura, .bokeh { display: none; } }
-
-    /* ===== 顶栏组件（logo / 状态灯 / 时钟 / 导航，与首页同一套） ===== */
-    .logo { display: flex; align-items: center; gap: 8px; min-width: 0; }
-    .logo-mark { width: 24px; height: 24px; flex: none; filter: drop-shadow(0 2px 6px rgba(255,126,182,.35)); }
-    .logo-text {
-      font-weight: 700; font-size: 16.5px; letter-spacing: 1px; white-space: nowrap;
-      background: linear-gradient(100deg, #ff7eb6 10%, #a78bfa 90%);
-      -webkit-background-clip: text; background-clip: text; color: transparent;
-    }
-    .logo-text .crumb { color: var(--muted); font-weight: 700; -webkit-text-fill-color: var(--muted); font-size: 12px; letter-spacing: 0; }
-    .header-right { display: flex; align-items: center; justify-self: center; min-width: 0; }
-    .clock {
-      font-size: 14px; font-weight: 700; color: var(--muted);
-      font-variant-numeric: tabular-nums; letter-spacing: 1px; white-space: nowrap; flex: none;
-      justify-self: end;
-    }
-    .nav-links {
-      display: flex; align-items: center; gap: 3px; flex: none;
-      background: #fff; border: 2px solid var(--line); border-radius: 999px; padding: 3px;
-    }
-    .nav-links a {
-      padding: 6px 19px; border-radius: 999px; color: var(--muted);
-      font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap;
-      transition: color .2s var(--spring-soft), background-color .25s var(--spring-soft);
-    }
-    .nav-links a:hover { color: var(--accent); background: #fff0f7; }
-    .nav-links a.cur { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff; }
-    .nav-links a.cur:hover { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff; }
+    @media (prefers-reduced-motion: reduce) { .sakura { display: none; } }
 
     /* ===== 顶栏 ===== */
     header {
       position: sticky; top: 10px; z-index: 5;
-      display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
       margin: 10px 16px 0; padding: 12px 22px;
       background: var(--panel);
+      
       border: 2px solid var(--line); border-radius: 999px; box-shadow: var(--shadow);
     }
     .logo {
@@ -164,7 +106,8 @@
     }
 
     .card {
-      background: linear-gradient(168deg, rgba(255,255,255,.97) 0%, rgba(255,255,255,.9) 55%, rgba(255,246,251,.88) 100%);
+      background: var(--panel);
+      
       border: 2px solid var(--line); border-radius: var(--radius);
       box-shadow: var(--shadow);
       padding: 24px;
@@ -300,13 +243,8 @@
     }
     @media (max-width: 560px) {
       main { padding: 8px 10px calc(24px + env(safe-area-inset-bottom)); }
-      header { display: flex; justify-content: space-between; margin: 6px 8px 0; padding: 6px 8px 6px 12px; top: calc(5px + env(safe-area-inset-top)); }
-      .logo-text { font-size: 14px; letter-spacing: .5px; }
-      .logo-mark { width: 19px; height: 19px; }
-      .logo-text .crumb { display: none; }
-      .clock { display: none; }
-      .nav-links { padding: 2px; border-width: 1.5px; }
-      .nav-links a { padding: 5px 11px; font-size: 11.5px; min-height: 30px; display: inline-flex; align-items: center; }
+      header { margin: 6px 8px 0; padding: 7px 13px; top: calc(5px + env(safe-area-inset-top)); }
+      .logo { font-size: 13px; }
       .back { padding: 7px 13px; font-size: 13px; }
       .card { padding: 13px; }
       .card + .card { margin-top: 12px; }
@@ -432,8 +370,6 @@
       body::before { position: absolute; inset: 0; height: 100%; min-height: 100vh; }
       /* 樱花：去掉合成层提示 + 拉长周期（同样的视觉，帧率压力更低） */
       .sakura { will-change: auto; animation-duration: calc(var(--dur, 14s) * 1.35); }
-      /* 光斑同步降载：拉长周期、减轻模糊 */
-      .bokeh { filter: blur(1px); animation-duration: calc(var(--bd, 18s) * 1.3); }
       /* 入场动画更短更轻 */
       .tile { animation-duration: .34s; }
       /* 关闭容器的布局隔离（container-type 会带来额外布局开销） */
@@ -454,39 +390,20 @@
 </head>
 <body>
   <header>
-    <div class="logo">
-      <svg class="logo-mark" viewBox="0 0 24 24" aria-hidden="true">
-        <defs>
-          <linearGradient id="lgMark" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#ffb3d1"/><stop offset="45%" stop-color="#ff7eb6"/><stop offset="100%" stop-color="#9d7bfa"/>
-          </linearGradient>
-          <linearGradient id="lgMarkHi" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#ffffff" stop-opacity=".85"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-          </linearGradient>
-        </defs>
+    <div class="logo" style="display:flex;align-items:center;gap:7px"><svg class="logo-mark" viewBox="0 0 24 24" aria-hidden="true" style="width:18px;height:18px;flex:none">
+        <defs><linearGradient id="lgMark" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#ff7eb6"/><stop offset="100%" stop-color="#a78bfa"/>
+        </linearGradient></defs>
         <g fill="url(#lgMark)">
-          <ellipse cx="12" cy="6.6" rx="2.7" ry="4.1"/>
-          <ellipse cx="12" cy="6.6" rx="2.7" ry="4.1" transform="rotate(72 12 12)"/>
-          <ellipse cx="12" cy="6.6" rx="2.7" ry="4.1" transform="rotate(144 12 12)"/>
-          <ellipse cx="12" cy="6.6" rx="2.7" ry="4.1" transform="rotate(216 12 12)"/>
-          <ellipse cx="12" cy="6.6" rx="2.7" ry="4.1" transform="rotate(288 12 12)"/>
+          <ellipse cx="12" cy="6.7" rx="2.5" ry="3.7"/>
+          <ellipse cx="12" cy="6.7" rx="2.5" ry="3.7" transform="rotate(72 12 12)"/>
+          <ellipse cx="12" cy="6.7" rx="2.5" ry="3.7" transform="rotate(144 12 12)"/>
+          <ellipse cx="12" cy="6.7" rx="2.5" ry="3.7" transform="rotate(216 12 12)"/>
+          <ellipse cx="12" cy="6.7" rx="2.5" ry="3.7" transform="rotate(288 12 12)"/>
         </g>
-        <ellipse cx="12" cy="5.3" rx="1.05" ry="1.8" fill="url(#lgMarkHi)" opacity=".6"/>
-        <circle cx="12" cy="12" r="2" fill="#fff8fc"/>
-        <circle cx="12" cy="12" r=".9" fill="#ffd166"/>
-        <path d="M19.4 3.6l.5 1.3 1.3.5-1.3.5-.5 1.3-.5-1.3-1.3-.5 1.3-.5z" fill="#ffd166" opacity=".9"/>
-      </svg>
-      <span class="logo-text">樱市罗盘<span class="crumb"> · VIX 观测</span></span>
-    </div>
-    <nav class="header-right">
-      <span class="nav-links">
-        <a href="./index.html">首页</a>
-        <a href="./vix.html" class="cur">VIX</a>
-        <a href="./fng.html">A股恐贪</a>
-        <a href="./gold.html">黄金</a>
-      </span>
-    </nav>
-    <span class="clock" id="clock" title="本地时间">--:--:--</span>
+        <circle cx="12" cy="12" r="1.5" fill="#fff8fc"/>
+      </svg><span style="background:linear-gradient(100deg,#ff7eb6,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:700">VIX 恐慌指数</span></div>
+    <a class="back" href="./index.html">← 返回首页</a>
   </header>
 
   <main>
@@ -500,7 +417,7 @@
           </div>
           <div class="ov-meta">
             <div id="vixTime">最后成交：--</div>
-            <div>CBOE 官方数据 · 页面每 5 秒检查更新（上游约 5 分钟同步一次） <span id="vixErr" style="color:#d97706"></span></div>
+            <div>CBOE 官方数据 · 页面每 1 秒刷新 <span id="vixErr" style="color:#d97706"></span></div>
           </div>
         </div>
         <div class="ov-right">
@@ -545,13 +462,20 @@
             <button class="rbtn" data-days="0" type="button">全部</button>
           </span>
         </span>
+        <span class="ctrl-group">
+          <span class="ctrl-lbl">对照</span>
+          <span class="seg" id="usSeg">
+            <button class="rbtn on" data-us="spx" type="button">标普500</button>
+            <button class="rbtn on" data-us="ndx" type="button">纳斯达克</button>
+          </span>
+        </span>
       </div>
       <div class="chart-wrap" id="chartWrap">
         <div class="tip" id="chartTip"></div>
         <svg id="chartSvg" viewBox="0 0 820 320" aria-label="VIX 收盘走势图"></svg>
       </div>
       <div class="chart-foot">
-        <span>虚线参考：15 平静 / 20 警惕 / 30 恐慌（VIX 绝对值分档）</span>
+        <span>虚线参考：15 平静 / 20 警惕 / 30 恐慌（VIX 分档）<span id="usHint"></span></span>
         <span id="chartHint">电脑悬停 / 手机滑动图表查看数值</span>
       </div>
     </section>
@@ -596,7 +520,7 @@
   /* ===== 樱花飘落 ===== */
   (function () {
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    var COUNT = (window.innerWidth < 640) ? 4 : 14;
+    var COUNT = 16;
     var GLYPHS = ['🌸', '❀', '✿', '🌸', '❀'];
     var colors = ['#ffb7d9', '#ffc7e5', '#f5c7ff', '#ffd6ea'];
     for (var i = 0; i < COUNT; i++) {
@@ -618,58 +542,6 @@
       s.appendChild(inner);
       document.body.appendChild(s);
     }
-  })();
-
-  /* ===== 漂浮光斑（bokeh）：桌面 6 颗 / 手机 3 颗，与樱花共用暂停逻辑 ===== */
-  (function () {
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    var N = (window.innerWidth < 640) ? 3 : 6;
-    for (var i = 0; i < N; i++) {
-      var b = document.createElement('span');
-      b.className = 'bokeh';
-      var size = 26 + Math.random() * 90;
-      b.style.width = b.style.height = size + 'px';
-      b.style.left = (Math.random() * 96) + 'vw';
-      b.style.top = (6 + Math.random() * 80) + 'vh';
-      b.style.setProperty('--bd', (12 + Math.random() * 14) + 's');
-      b.style.setProperty('--bx', (Math.random() * 70 - 35).toFixed(0) + 'px');
-      b.style.opacity = String(0.3 + Math.random() * 0.4);
-      b.style.animationDelay = (-Math.random() * 20) + 's';
-      document.body.appendChild(b);
-    }
-  })();
-
-  /* ===== 角落樱花剪影：右下大朵 + 左侧小朵，纯静态装饰 ===== */
-  (function () {
-    var petals = '<g fill="COLOR"><ellipse cx="12" cy="6.6" rx="2.7" ry="4.1"/>'
-      + '<ellipse cx="12" cy="6.6" rx="2.7" ry="4.1" transform="rotate(72 12 12)"/>'
-      + '<ellipse cx="12" cy="6.6" rx="2.7" ry="4.1" transform="rotate(144 12 12)"/>'
-      + '<ellipse cx="12" cy="6.6" rx="2.7" ry="4.1" transform="rotate(216 12 12)"/>'
-      + '<ellipse cx="12" cy="6.6" rx="2.7" ry="4.1" transform="rotate(288 12 12)"/></g>';
-    var mk = function (cls, size, op, rot, color) {
-      var w = document.createElement('div');
-      w.className = 'corner-sakura ' + cls;
-      w.style.width = w.style.height = size + 'px';
-      w.style.opacity = op;
-      w.style.transform = 'rotate(' + rot + 'deg)';
-      w.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + petals.replace('COLOR', color) + '</svg>';
-      document.body.appendChild(w);
-    };
-    mk('cs-br', 220, .16, -15, '#ff9ecb');
-    mk('cs-tl', 130, .12, 24, '#c4b5fd');
-  })();
-
-  /* ===== 顶栏时钟 ===== */
-  (function () {
-    var clock = document.getElementById('clock');
-    if (!clock) return;
-    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
-    function tick() {
-      var d = new Date();
-      clock.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
-    }
-    tick();
-    setInterval(tick, 1000);
   })();
 
   /* ===== VIX 详情 ===== */
@@ -708,6 +580,7 @@
     var REFRESH_SECONDS = 5;   // 全部数据每 5 秒刷新
     var left = 0, busy = false, hasData = false, backoff = false;
     var HIST = null, INTRA = null, MODE = 'day', RANGE = 60, liveDate = null, lastPlottedPrice = null;
+    var US = null, USM = { spx: {}, ndx: {} }, SHOW = { spx: true, ndx: true };   // 美股对照线（标普/纳指）
     var lastLiveKey = '', lastHistKey = '';   // 数据指纹：未变化时跳过渲染
 
     var $ = function (id) { return document.getElementById(id);
@@ -729,9 +602,9 @@
     // 按实际可见宽度选择画布比例：手机更「方」，曲线才有起伏感；桌面用宽画布
     function calcSize() {
       var cw = wrap.clientWidth || 820;
-      if (cw < 460) return { W: 400, H: 300, PAD: { l: 36, r: 42, t: 16, b: 32 } };
-      if (cw < 700) return { W: 620, H: 310, PAD: { l: 44, r: 50, t: 17, b: 34 } };
-      return { W: 820, H: 320, PAD: { l: 48, r: 56, t: 18, b: 36 } };
+      if (cw < 460) return { W: 400, H: 300, PAD: { l: 36, r: 58, t: 16, b: 32 } };
+      if (cw < 700) return { W: 620, H: 310, PAD: { l: 44, r: 64, t: 17, b: 34 } };
+      return { W: 820, H: 320, PAD: { l: 48, r: 70, t: 18, b: 36 } };
     }
 
     var MAXP = 1400;  // 绘图抽样上限，全量视图下保持流畅
@@ -803,6 +676,48 @@
       return pts;
     }
 
+    /* ===== 美股对照线数据（标普500 / 纳斯达克100）===== */
+    function usAt(map, date) {
+      if (map[date] !== undefined) return map[date];
+      var d = new Date(date + 'T00:00:00Z');
+      for (var k = 1; k <= 10; k++) {          // 向前找最近交易日（跨周末/休市）
+        d.setUTCDate(d.getUTCDate() - 1);
+        var key = d.toISOString().slice(0, 10);
+        if (map[key] !== undefined) return map[key];
+      }
+      return 0;
+    }
+
+    function loadUs() {
+      fetch('./data/us-history.json', { cache: 'no-cache' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (d) {
+          US = d;
+          USM = { spx: {}, ndx: {} };
+          (d.spx || []).forEach(function (x) { USM.spx[x[0]] = x[1]; });
+          (d.ndx || []).forEach(function (x) { USM.ndx[x[0]] = x[1]; });
+          var hint = document.getElementById('usHint');
+          if (hint && d.src) {
+            hint.textContent = '　琥珀虚线 标普500 · 蓝虚线 纳斯达克100（右轴 = 区间起点 100 的相对涨跌幅）';
+          }
+          drawChart();
+        })
+        .catch(function () {});
+    }
+
+    (function bindUs() {
+      var seg = document.getElementById('usSeg');
+      if (!seg) return;
+      Array.prototype.forEach.call(seg.querySelectorAll('.rbtn'), function (b2) {
+        b2.addEventListener('click', function () {
+          var k = b2.getAttribute('data-us');
+          SHOW[k] = !SHOW[k];
+          b2.classList.toggle('on', SHOW[k]);
+          drawChart();
+        });
+      });
+    })();
+
     function drawChart() {
       var pts = plotPoints();
       if (!pts.length) {
@@ -859,6 +774,61 @@
       area += 'L' + f2(nx(pts.length - 1)) + ' ' + y1 + 'L' + f2(nx(0)) + ' ' + y1 + 'Z';
       s += '<path d="' + area + '" fill="url(#lgArea)"/>';
       s += '<path id="vixLine" d="' + line + '" fill="none" stroke="url(#lgLine)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>';
+
+      // ===== 叠加美股对照线（右轴：各线以区间起点=100 归一化，看相对涨跌幅）=====
+      if (MODE !== 'min' && US && ((SHOW.spx && US.spx) || (SHOW.ndx && US.ndx))) {
+        var usSeries = [];
+        if (SHOW.spx && US.spx) usSeries.push({ map: USM.spx, color: '#f59e0b' });
+        if (SHOW.ndx && US.ndx) usSeries.push({ map: USM.ndx, color: '#3b82f6' });
+        usSeries.forEach(function (se) {
+          var base = 0;
+          for (var bi = 0; bi < pts.length; bi++) {
+            var bv = usAt(se.map, pts[bi][0]);
+            if (bv > 0) { base = bv; break; }              // 区间内首个有效值 = 100
+          }
+          se.base = base;
+          se.vals = pts.map(function (pp) {
+            var v = usAt(se.map, pp[0]);
+            return (v > 0 && base > 0) ? (v / base * 100) : null;
+          });
+        });
+        var ulo = Infinity, uhi = -Infinity;
+        usSeries.forEach(function (se) {
+          se.vals.forEach(function (v) {
+            if (v === null) return;
+            if (v < ulo) ulo = v;
+            if (v > uhi) uhi = v;
+          });
+        });
+        ulo = Math.min(ulo, 100); uhi = Math.max(uhi, 100);
+        if (isFinite(ulo) && uhi > ulo) {
+          var upad = (uhi - ulo) * 0.08;
+          ulo -= upad; uhi += upad;
+          var pny = function (v) { return y1 - (v - ulo) / (uhi - ulo) * (y1 - y0); };
+          // 100 基准线（区间起点）
+          s += '<line x1="' + x0 + '" y1="' + f2(pny(100)) + '" x2="' + x1 + '" y2="' + f2(pny(100))
+            + '" stroke="#d6d3d1" stroke-width="1" stroke-dasharray="3 3" opacity="0.9"/>';
+          usSeries.forEach(function (se) {
+            var d = '', has = false;
+            se.vals.forEach(function (v, i) {
+              if (v === null) return;
+              d += (has ? 'L' : 'M') + f2(nx(i)) + ' ' + f2(pny(v));
+              has = true;
+            });
+            if (has) {
+              s += '<path d="' + d + '" fill="none" stroke="' + se.color
+                + '" stroke-width="1.6" stroke-dasharray="5 4" opacity="0.95"/>';
+            }
+          });
+          [0, 0.5, 1].forEach(function (t) {
+            var v = ulo + (uhi - ulo) * t;
+            var diff = Math.round((v - 100) * 10) / 10;
+            var txt = (diff > 0 ? '+' : '') + diff.toFixed(0) + '%';
+            s += '<text x="' + (x1 + 8) + '" y="' + (pny(v) + 4) + '" font-size="' + fs + '" fill="#a8a29e">'
+              + txt + '</text>';
+          });
+        }
+      }
 
       // x 轴标签（首/中/尾）：首尾用 start/end 对齐，避免贴边被裁
       var crossYear = pts[0][0].slice(0, 4) !== pts[pts.length - 1][0].slice(0, 4);
@@ -1047,11 +1017,9 @@
     /* ---------- 实时数据 ---------- */
     function renderLive(d) {
       var price = parseFloat(d.price);
+      var prev = parseFloat(d.prev_close);
       var chg = parseFloat(d.change);
       var pct = parseFloat(d.change_percent);
-      /* CBOE 的 prev_day_close 在盘后已等于当日收盘价（并非前一交易日），
-         故昨收优先用 price - change 反推；只有 change 缺失时才退回该字段。 */
-      var prev = (isFinite(price) && isFinite(chg)) ? price - chg : parseFloat(d.prev_close);
       if (!isFinite(price) || !isFinite(prev)) throw new Error('bad fields');
       if (!isFinite(chg)) chg = price - prev;
       if (!isFinite(pct)) pct = prev ? (chg / prev) * 100 : 0;
@@ -1130,6 +1098,8 @@
 
     // 历史（日线）为日频、分时盘中每 5 分钟更新：都按 60 秒重取即可
     setInterval(loadHist, 5000);
+    loadUs();
+    setInterval(loadUs, 5000);   // 美股对照线
     setInterval(loadIntra, 5000);
 
     elBtn.addEventListener('click', function () { loadLive(); loadHist(); loadIntra(); });
@@ -1187,9 +1157,9 @@
     else { window.addEventListener('load', show, { once: true }); }
   })();
 
-  /* ===== 樱花/光斑智能暂停：页面隐藏或滚动时暂停（帧率与省电优先，停止后自动恢复） ===== */
+  /* ===== 樱花智能暂停：页面隐藏或滚动时暂停（帧率与省电优先，停止后自动恢复） ===== */
   (function () {
-    var els = document.querySelectorAll('.sakura, .bokeh');
+    var els = document.querySelectorAll('.sakura');
     if (!els.length) return;
     var setAll = function (state) {
       for (var i = 0; i < els.length; i++) els[i].style.animationPlayState = state;
