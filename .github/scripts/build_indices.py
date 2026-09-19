@@ -63,7 +63,9 @@ def main() -> None:
         sys.exit(1)
 
     os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
-    with open(dst, "w", encoding="utf-8") as f:
+    # newline="\n" 固定为 LF：indent=0 也是多行输出，Windows 上默认 CRLF 会与
+    # Linux runner 的 LF 产出产生纯行尾差异，导致定时任务每次都被判为"有变化"
+    with open(dst, "w", encoding="utf-8", newline="\n") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"), indent=0)
     print("wrote %s: %d 个指标" % (dst, len(out)))
 

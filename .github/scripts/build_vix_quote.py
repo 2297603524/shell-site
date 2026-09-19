@@ -67,7 +67,9 @@ def main() -> None:
     }
 
     os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
-    with open(dst, "w", encoding="utf-8") as f:
+    # newline="\n" 是必须的：这里用了 indent=2 的多行输出，Windows 上默认会写成 CRLF，
+    # 与 Linux runner 产出的 LF 版本字节不同 → 每次定时任务都会产生一次"全文件重写"的空提交
+    with open(dst, "w", encoding="utf-8", newline="\n") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
 
     print("wrote %s" % dst)
