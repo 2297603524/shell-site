@@ -254,46 +254,22 @@
     .bg-c4 { color: #65a30d; border-color: #d9f99d; background: #f7fee7; }
     .bg-c5 { color: #16a34a; border-color: #bbf7d0; background: #f0fdf4; }
 
-    /* ===== 美股多指标卡（紧凑型，不需要走势图） ===== */
-    .tile-mkt {
-      aspect-ratio: auto;
-      min-height: 0;
-      padding: 13px 15px;
+    /* ===== 预留占位卡 ===== */
+    .tile-empty {
+      border-style: dashed;
+      background: rgba(255, 255, 255, .42);
+      box-shadow: none;
     }
-    .tile-mkt .tile-title { font-size: 13px; }
-    .mkt-price {
-      font-size: clamp(21px, 4.6vw, 27px); font-weight: 700;
-      font-variant-numeric: tabular-nums; line-height: 1.15;
-      transition: color .35s var(--spring-soft);
+    .tile-empty .tile-title { color: var(--muted); font-weight: 400; }
+    .tile-empty .badge { color: var(--muted); border-style: dashed; background: transparent; }
+    .ph-text { color: #c9bdd4 !important; }
+    .ph-chart {
+      height: 52px; border-radius: 10px;
+      border: 2px dashed var(--line);
+      background: repeating-linear-gradient(90deg, transparent 0 14px, rgba(255, 215, 236, .5) 14px 15px);
+      display: flex; align-items: center; justify-content: center;
+      color: #ddb3d1; font-size: 15px;
     }
-    .mkt-chg {
-      font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
-      margin-top: 5px; white-space: nowrap;
-      transition: color .35s var(--spring-soft);
-    }
-
-    /* ===== VIX 期限结构 ===== */
-    .term { padding: 15px 18px; margin-top: 14px; }
-    .term-head {
-      display: flex; justify-content: space-between; align-items: center;
-      gap: 10px; flex-wrap: wrap; margin-bottom: 12px;
-    }
-    .term-title { font-weight: 700; font-size: 14px; }
-    .term-title .sub { color: var(--muted); font-weight: 400; font-size: 10.5px; margin-left: 6px; }
-    .term-rows { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-    .term-row { min-width: 0; }
-    .term-k {
-      display: flex; justify-content: space-between; gap: 6px;
-      font-size: 11px; color: var(--muted); margin-bottom: 5px;
-    }
-    .term-k b { color: var(--ink); font-variant-numeric: tabular-nums; }
-    .term-track { height: 7px; border-radius: 999px; background: #f4ecf7; overflow: hidden; }
-    .term-fill {
-      display: block; height: 100%; border-radius: 999px;
-      background: linear-gradient(90deg, var(--accent), var(--accent2));
-      transition: width .5s var(--spring-soft);
-    }
-    .term-note { color: var(--muted); font-size: 11px; margin-top: 11px; line-height: 1.6; }
 
     /* ===== 页脚（与内页保持一致） ===== */
     footer {
@@ -357,12 +333,7 @@
       .tile-actions { gap: 4px; flex-wrap: nowrap; }
       .btn { padding: 4px 9px; font-size: 10.5px; border-width: 1.5px; min-height: 34px; display: inline-flex; align-items: center; justify-content: center; }
       .tile:active { transform: scale(.98); }
-      .mkt-price { font-size: 22px; }
-      .mkt-chg { font-size: 11px; }
-      .term { padding: 13px 14px; margin-top: 10px; }
-      .term-rows { gap: 8px; }
-      .term-k { font-size: 10px; }
-      .term-note { font-size: 10px; margin-top: 9px; }
+      .tile-empty .ph-chart { height: 38px; }
     }
     /* 极窄（<360px）：徽章换行到标题下方 */
     @media (max-width: 360px) {
@@ -609,56 +580,45 @@
         </div>
       </section>
 
-      <!-- 美股多指标（CBOE 官方，随 VIX 同步刷新） -->
-      <section class="card tile tile-mkt" aria-label="VVIX 波动率指数">
-        <div class="tile-title">VVIX<span class="sub">VIX 的波动率</span></div>
-        <div class="mkt-price flat" id="mkVvixPrice">--</div>
-        <div class="mkt-chg flat" id="mkVvixChg">等待数据…</div>
+      <section class="card tile tile-empty" aria-hidden="true">
+        <div class="tile-top">
+          <div class="tile-title">✧ 新指标<span class="sub">等待接入数据</span></div>
+          <span class="badge">筹备中</span>
+        </div>
+        <div class="tile-mid">
+          <div class="vix-price flat ph-text">--</div>
+          <div class="vix-chg flat ph-text">待接入</div>
+        </div>
+        <div class="tile-body"><div class="ph-chart">✧</div></div>
+        <div class="tile-foot"><div class="tile-time">规划中 · 敬请期待 (´▽`)</div></div>
       </section>
 
-      <section class="card tile tile-mkt" aria-label="VIX9D 短期波动率">
-        <div class="tile-title">VIX9D<span class="sub">9 天短期波动率</span></div>
-        <div class="mkt-price flat" id="mkVix9dPrice">--</div>
-        <div class="mkt-chg flat" id="mkVix9dChg">等待数据…</div>
+      <section class="card tile tile-empty" aria-hidden="true">
+        <div class="tile-top">
+          <div class="tile-title">✧ 新指标<span class="sub">等待接入数据</span></div>
+          <span class="badge">筹备中</span>
+        </div>
+        <div class="tile-mid">
+          <div class="vix-price flat ph-text">--</div>
+          <div class="vix-chg flat ph-text">待接入</div>
+        </div>
+        <div class="tile-body"><div class="ph-chart">✧</div></div>
+        <div class="tile-foot"><div class="tile-time">规划中 · 敬请期待 (´▽`)</div></div>
       </section>
 
-      <section class="card tile tile-mkt" aria-label="VIX3M 中长期波动率">
-        <div class="tile-title">VIX3M<span class="sub">3 个月中长期波动率</span></div>
-        <div class="mkt-price flat" id="mkVix3mPrice">--</div>
-        <div class="mkt-chg flat" id="mkVix3mChg">等待数据…</div>
-      </section>
-
-      <section class="card tile tile-mkt" aria-label="标普500">
-        <div class="tile-title">标普500<span class="sub">SPX 大盘指数</span></div>
-        <div class="mkt-price flat" id="mkSpxPrice">--</div>
-        <div class="mkt-chg flat" id="mkSpxChg">等待数据…</div>
-      </section>
-
-      <section class="card tile tile-mkt" aria-label="纳斯达克100">
-        <div class="tile-title">纳斯达克100<span class="sub">NDX 科技股指数</span></div>
-        <div class="mkt-price flat" id="mkNdxPrice">--</div>
-        <div class="mkt-chg flat" id="mkNdxChg">等待数据…</div>
-      </section>
-
-      <section class="card tile tile-mkt" aria-label="罗素2000">
-        <div class="tile-title">罗素2000<span class="sub">RUT 小盘股指数</span></div>
-        <div class="mkt-price flat" id="mkRutPrice">--</div>
-        <div class="mkt-chg flat" id="mkRutChg">等待数据…</div>
+      <section class="card tile tile-empty" aria-hidden="true">
+        <div class="tile-top">
+          <div class="tile-title">✧ 新指标<span class="sub">等待接入数据</span></div>
+          <span class="badge">筹备中</span>
+        </div>
+        <div class="tile-mid">
+          <div class="vix-price flat ph-text">--</div>
+          <div class="vix-chg flat ph-text">待接入</div>
+        </div>
+        <div class="tile-body"><div class="ph-chart">✧</div></div>
+        <div class="tile-foot"><div class="tile-time">规划中 · 敬请期待 (´▽`)</div></div>
       </section>
     </div>
-
-    <!-- VIX 期限结构：三条波动率期限的相对高低，比单看 VIX 更能判断恐慌是否突发 -->
-    <section class="card term" aria-label="VIX 期限结构">
-      <div class="term-head">
-        <div class="term-title">VIX 期限结构<span class="sub">VIX9D → VIX → VIX3M</span></div>
-        <span class="badge" id="termVerdict">等待数据…</span>
-      </div>
-      <div class="term-rows" id="termRows"></div>
-      <div class="term-note">
-        曲线向上（远期高于近期）称「升水」，表示市场预期平稳、愿意为长期不确定性付溢价；
-        若短期反超长期形成「倒挂」，通常意味着突发恐慌、避险情绪集中释放——历史上多出现在急跌初期。
-      </div>
-    </section>
   </main>
 
   <footer>
@@ -917,77 +877,6 @@
       if (d.spark) drawMini($('auSpark'), $('auSparkLabel'), d.spark, 'au');
     }
 
-    /* ---------- 美股多指标墙 ---------- */
-    var MKT_FIELDS = [
-      ['vvix', 'mkVvix'], ['vix9d', 'mkVix9d'], ['vix3m', 'mkVix3m'],
-      ['spx', 'mkSpx'], ['ndx', 'mkNdx'], ['rut', 'mkRut']
-    ];
-    var lastMkt = {};
-
-    /* 指数点位带千分位取整，波动率类保留两位 */
-    function fmtPx(v) { return Math.abs(v) >= 1000 ? f2(v, 0) : f2(v, 2); }
-
-    function renderMkt(list) {
-      if (!list || !list.length) return;
-      var byKey = {};
-      list.forEach(function (it) { byKey[it.key] = it; });
-      MKT_FIELDS.forEach(function (pair) {
-        var it = byKey[pair[0]];
-        var elP = $(pair[1] + 'Price'), elC = $(pair[1] + 'Chg');
-        if (!it || !elP || !elC) return;
-        var price = parseFloat(it.price);
-        if (!isFinite(price)) return;
-        if (lastMkt[pair[0]] !== undefined && lastMkt[pair[0]] !== price && window.__flash) window.__flash(elP);
-        lastMkt[pair[0]] = price;
-
-        var chg = parseFloat(it.chg), pct = parseFloat(it.pct);
-        var cls = (chg > 0) ? 'up' : ((chg < 0) ? 'down' : 'flat');
-        setCls(elP, cls);
-        tweenNum(elP, price, fmtPx);
-        setCls(elC, cls);
-        if (isFinite(chg) && isFinite(pct)) {
-          var sign = chg > 0 ? '+' : '';
-          elC.textContent = sign + fmtPx(chg) + ' (' + sign + f2(pct, 2) + '%)';
-        } else {
-          elC.textContent = '—';
-        }
-      });
-    }
-
-    /* ---------- VIX 期限结构：近期 / 现值 / 远期 的相对高低 ---------- */
-    function renderTerm(term) {
-      var box = $('termRows'), verdict = $('termVerdict');
-      if (!box || !verdict || !term || term.length !== 3) return;
-      var vals = term.map(function (t) { return parseFloat(t.price); });
-      if (vals.some(function (v) { return !isFinite(v); })) return;
-      var mx = Math.max.apply(null, vals);
-      if (!(mx > 0)) return;
-
-      var html = '';
-      term.forEach(function (t, i) {
-        /* 条宽按占最大值比例，并给最矮的一条留 20% 底宽，避免视觉上「消失」 */
-        var w = Math.max(20, Math.round(vals[i] / mx * 100));
-        html += '<div class="term-row">' +
-          '<div class="term-k"><span>' + t.name + '</span><b>' + f2(vals[i], 2) + '</b></div>' +
-          '<div class="term-track"><i class="term-fill" style="width:' + w + '%"></i></div>' +
-          '</div>';
-      });
-      box.innerHTML = html;
-
-      var short = vals[0], long = vals[2];
-      var gap = long ? (long - short) / long : 0;
-      if (short > long) {
-        verdict.textContent = '倒挂 · 短期恐慌 (ﾟДﾟ;)';
-        verdict.className = 'badge b-red';
-      } else if (Math.abs(gap) < 0.06) {
-        verdict.textContent = '曲线走平 · 观望 (・_・;)';
-        verdict.className = 'badge b-orange';
-      } else {
-        verdict.textContent = '正向升水 · 平稳 (´▽`)';
-        verdict.className = 'badge b-green';
-      }
-    }
-
     function loadAll() {
       if (busy) return;
       busy = true;
@@ -1003,8 +892,6 @@
             if (d.vix) renderVix(d.vix);
             if (d.fng) renderFng(d.fng);
             if (d.gold) renderGold(d.gold);
-            if (d.mkt) renderMkt(d.mkt);
-            if (d.term) renderTerm(d.term);
           }
           elVixErr.textContent = '';
           elFgErr.textContent = '';
