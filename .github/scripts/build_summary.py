@@ -2,18 +2,21 @@
 """为首页生成轻量汇总数据 data/summary.json
 
 首页原本要加载 vix-history.json(350KB) + fear-greed.json(173KB) 才能画出两张迷你走势，
-是首屏卡顿的主因。这里把它们裁剪成首页真正需要的部分（当前值 + 近 30 个走势点 + 各指数恐贪值），
-体积约 2~3KB，首页只请求这一个文件。
+是首屏卡顿的主因。这里把它们裁剪成首页真正需要的部分（当前值 + 近 30 个走势点 + 各指数恐贪值
++ 美股多指标快照），体积约 5KB，首页只请求这一个文件。
 
 用法:
     python build_summary.py [输出json路径]   默认 data/summary.json
-    （需先存在 data/vix.json、data/vix-history.json、data/fear-greed.json）
+    （需先存在 data/vix.json、data/vix-history.json、data/fear-greed.json、
+      data/gold-fng.json、data/indices.json；缺失的模块会被跳过并保留其余部分）
 """
 import json
 import os
 import sys
 
 SPARK_N = 30
+# 首页指标墙要展示的美股指标（顺序即展示顺序）；VIX 已单列，不重复
+MKT_KEYS = ("vvix", "vix9d", "vix3m", "spx", "ndx", "rut")
 
 
 def _load(path):
@@ -33,11 +36,19 @@ def main() -> None:
         v = _load(os.path.join(data_dir, "vix.json"))
         h = _load(os.path.join(data_dir, "vix-history.json"))
         spark = [[p[0], p[1]] for p in (h.get("points") or [])[-SPARK_N:]]
+        # CBOE 的 prev_day_close 在盘后已等于当日收盘价，不是前一交易日收盘；
+        # 统一用 price - change 反推真实昨收，缺失时才退回原字段。
+        prev = v.get("prev_close")
+        try:
+            if v.get("price") is not None and v.get("change") is not None:
+                prev = round(float(v["price"]) - float(v["change"]), 4)
+        except (TypeError, ValueError):
+            pass
         out["vix"] = {
             "price": v.get("price"),
             "change": v.get("change"),
             "pct": v.get("change_percent"),
-            "prev": v.get("prev_close"),
+            "prev": prev,
             "time": v.get("last_trade_time"),
             "spark": spark,
         }
@@ -85,6 +96,36 @@ def main() -> None:
         }
     except Exception as e:  # noqa: BLE001
         print("gold summary failed: %s" % e)
+
+    # ---- 美股多指标（首页指标墙；数据来自 build_indices.py 的 indices.json）----
+    try:
+        ix = _load(os.path.join(data_dir, "indices.json"))
+        mkt = []
+        for k in MKT_KEYS:
+            it = ix.get(k) or {}
+            price = it.get("price")
+            if price is None or price == 0:
+                continue
+            mkt.append({
+                "key": k,
+                "name": it.get("name"),
+                "desc": it.get("desc"),
+                "price": price,
+                "chg": it.get("change"),
+                "pct": it.get("pct"),
+            })
+        if mkt:
+            out["mkt"] = mkt
+        # 期限结构只取三个波动率期限点（短名固定，便于前端横排展示）
+        term = []
+        for k, label in (("vix9d", "VIX9D"), ("vix", "VIX"), ("vix3m", "VIX3M")):
+            p = (ix.get(k) or {}).get("price")
+            if p:
+                term.append({"key": k, "name": label, "price": p})
+        if len(term) == 3:
+            out["term"] = term
+    except Exception as e:  # noqa: BLE001
+        print("market summary failed: %s" % e)
 
     if not out:
         print("nothing built, keep old file")

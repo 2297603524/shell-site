@@ -6,6 +6,12 @@
   <meta name="description" content="VIX 恐慌指数详细观测 —— 实时行情、120日走势、区间统计与解读。" />
   <title>VIX 恐慌指数 · 樱市罗盘</title>
   <meta name="theme-color" content="#ffe9f5" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23ff7eb6'%3E%3Cellipse cx='12' cy='6.6' rx='2.7' ry='4.1'/%3E%3Cellipse cx='12' cy='6.6' rx='2.7' ry='4.1' transform='rotate(72 12 12)'/%3E%3Cellipse cx='12' cy='6.6' rx='2.7' ry='4.1' transform='rotate(144 12 12)'/%3E%3Cellipse cx='12' cy='6.6' rx='2.7' ry='4.1' transform='rotate(216 12 12)'/%3E%3Cellipse cx='12' cy='6.6' rx='2.7' ry='4.1' transform='rotate(288 12 12)'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='2.2' fill='%23fff8fc'/%3E%3C/svg%3E" />
+  <link rel="canonical" href="https://2297603524.github.io/shell-site/vix.html" />
+  <meta property="og:url" content="https://2297603524.github.io/shell-site/vix.html" />
+  <meta property="og:site_name" content="樱市罗盘" />
+  <meta property="og:image" content="https://2297603524.github.io/shell-site/img/banner.webp" />
+  <meta name="twitter:card" content="summary_large_image" />
   <meta property="og:title" content="VIX 恐慌指数 · 樱市罗盘" />
   <meta property="og:description" content="30 天隐含波动率详细观测，CBOE 官方数据" />
   <meta property="og:type" content="website" />
@@ -493,7 +499,7 @@
           </div>
           <div class="ov-meta">
             <div id="vixTime">最后成交：--</div>
-            <div>CBOE 官方数据 · 页面每 1 秒刷新 <span id="vixErr" style="color:#d97706"></span></div>
+            <div>CBOE 官方数据 · 页面每 5 秒检查更新（上游约 5 分钟同步一次） <span id="vixErr" style="color:#d97706"></span></div>
           </div>
         </div>
         <div class="ov-right">
@@ -1040,9 +1046,11 @@
     /* ---------- 实时数据 ---------- */
     function renderLive(d) {
       var price = parseFloat(d.price);
-      var prev = parseFloat(d.prev_close);
       var chg = parseFloat(d.change);
       var pct = parseFloat(d.change_percent);
+      /* CBOE 的 prev_day_close 在盘后已等于当日收盘价（并非前一交易日），
+         故昨收优先用 price - change 反推；只有 change 缺失时才退回该字段。 */
+      var prev = (isFinite(price) && isFinite(chg)) ? price - chg : parseFloat(d.prev_close);
       if (!isFinite(price) || !isFinite(prev)) throw new Error('bad fields');
       if (!isFinite(chg)) chg = price - prev;
       if (!isFinite(pct)) pct = prev ? (chg / prev) * 100 : 0;

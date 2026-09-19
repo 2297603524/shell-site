@@ -1,0 +1,66 @@
+name: update-history
+
+# 低频任务：抓全量历史并重算模型（VIX 1990 至今日线、分时、A股恐贪、黄金恐贪）。
+# 这类脚本单次要几十秒，必须与高频报价任务分开，否则会拖垮 */5 的调度。
+on:
+  schedule:
+    # 北京 16:30（A 股收盘后）与北京 06:30（美股收盘后）
+    - cron: '30 8 * * *'
+    - cron: '30 22 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: site-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch VIX history (daily OHLC since 1990)
+        continue-on-error: true
+        run: |
+          python3 .github/scripts/build_vix_history.py data/vix-history.json
+
+      - name: Fetch VIX intraday (last 2 sessions)
+        continue-on-error: true
+        run: |
+          python3 .github/scripts/build_vix_intraday.py data/vix-intraday.json
+
+      - name: Fetch multi-index snapshot
+        continue-on-error: true
+        run: |
+          python3 .github/scripts/build_indices.py data/indices.json
+
+      - name: Build A-share fear & greed index
+        continue-on-error: true
+        run: |
+          python3 .github/scripts/build_fear_greed.py data/fear-greed.json
+
+      - name: Build gold fear & greed index
+        continue-on-error: true
+        run: |
+          python3 .github/scripts/build_gold_fng.py data/gold-fng.json
+
+      - name: Rebuild homepage summary
+        continue-on-error: true
+        run: |
+          python3 .github/scripts/build_summary.py data/summary.json
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data/
+          if git diff --cached --quiet; then
+            echo "数据无变化，跳过提交"
+          else
+            git commit -m "chore: 更新历史数据 [skip ci]"
+            git pull --rebase origin main
+            git push
+          fi

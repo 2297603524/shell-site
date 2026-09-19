@@ -1,0 +1,54 @@
+name: update-fast
+
+# 高频任务：只抓实时报价 + 重建首页摘要，几秒即可跑完。
+# 历史数据（1990 年至今的日线、恐贪模型等）由 update-history.yml 每天跑两次维护，
+# 放在这里会让单次 job 长达数十秒，导致高频调度被 GitHub 丢弃、退化成两小时一次。
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 与 update-history 共用同一个 group：两个 workflow 串行执行，避免并发 push 冲突
+concurrency:
+  group: site-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch CBOE VIX quote and write data/vix.json
+        run: |
+          curl -sf --max-time 30 "https://cdn.cboe.com/api/global/delayed_quotes/quotes/_VIX.json" -o /tmp/vix.json || { echo "CBOE quote fetch failed"; exit 0; }
+          mkdir -p data
+          # prev_close 用 price - change 反推：CBOE 盘后返回的 prev_day_close 已等于当日收盘价
+          jq '{price: .data.current_price, change: .data.price_change, change_percent: .data.price_change_percent, open: .data.open, high: .data.high, low: .data.low, prev_close: (if .data.price_change then (.data.current_price - .data.price_change) else .data.prev_day_close end), iv30: .data.iv30, last_trade_time: .data.last_trade_time, fetched_at: .timestamp, source: "CBOE"}' /tmp/vix.json > data/vix.json
+          cat data/vix.json
+
+      - name: Fetch multi-index snapshot and build data/indices.json
+        continue-on-error: true
+        run: |
+          python3 .github/scripts/build_indices.py data/indices.json
+
+      - name: Rebuild homepage summary (reads committed history files)
+        continue-on-error: true
+        run: |
+          python3 .github/scripts/build_summary.py data/summary.json
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/vix.json data/indices.json data/summary.json
+          if git diff --cached --quiet; then
+            echo "数据无变化，跳过提交"
+          else
+            git commit -m "chore: 更新实时行情 [skip ci]"
+            git pull --rebase origin main
+            git push
+          fi
