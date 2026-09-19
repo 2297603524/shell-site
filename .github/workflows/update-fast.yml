@@ -23,12 +23,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Fetch CBOE VIX quote and write data/vix.json
+        continue-on-error: true
         run: |
-          curl -sf --max-time 30 "https://cdn.cboe.com/api/global/delayed_quotes/quotes/_VIX.json" -o /tmp/vix.json || { echo "CBOE quote fetch failed"; exit 0; }
-          mkdir -p data
-          # prev_close 用 price - change 反推：CBOE 盘后返回的 prev_day_close 已等于当日收盘价
-          jq '{price: .data.current_price, change: .data.price_change, change_percent: .data.price_change_percent, open: .data.open, high: .data.high, low: .data.low, prev_close: (if .data.price_change then (.data.current_price - .data.price_change) else .data.prev_day_close end), iv30: .data.iv30, last_trade_time: .data.last_trade_time, fetched_at: .timestamp, source: "CBOE"}' /tmp/vix.json > data/vix.json
-          cat data/vix.json
+          python3 .github/scripts/build_vix_quote.py data/vix.json
 
       - name: Fetch multi-index snapshot and build data/indices.json
         continue-on-error: true
