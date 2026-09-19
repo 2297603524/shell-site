@@ -123,10 +123,11 @@
       background: linear-gradient(100deg, #ff7eb6 10%, #a78bfa 90%);
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
-    .header-right { display: flex; align-items: center; justify-self: end; min-width: 0; }
+    .header-right { display: flex; align-items: center; justify-self: center; min-width: 0; }
     .clock {
       font-size: 14px; font-weight: 700; color: var(--muted);
       font-variant-numeric: tabular-nums; letter-spacing: 1px; white-space: nowrap; flex: none;
+      justify-self: end;
     }
     .nav-links {
       display: flex; align-items: center; gap: 3px; flex: none;
@@ -478,7 +479,6 @@
       </svg>
       <span class="logo-text">樱市罗盘</span>
     </div>
-    <span class="clock" id="clock" title="本地时间">--:--:--</span>
     <nav class="header-right">
       <span class="nav-links">
         <a href="./index.html" class="cur">首页</a>
@@ -487,6 +487,7 @@
         <a href="./gold.html">黄金</a>
       </span>
     </nav>
+    <span class="clock" id="clock" title="本地时间">--:--:--</span>
   </header>
 
   <main>
