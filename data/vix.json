@@ -5,8 +5,9 @@
   "open": 15.26,
   "high": 15.63,
   "low": 14.8,
-  "prev_close": 15.44,
-  "iv30": 76.592,
+  "prev_close": 14.81,
+  "iv30": 76.605,
   "last_trade_time": "2026-09-18T16:15:01",
+  "fetched_at": "2026-09-21 07:13:27",
   "source": "CBOE"
 }
